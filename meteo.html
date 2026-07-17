@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Météo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Météo — écran d'affichage permanent, 1024×600
+   Le fond ne s'éclaircit jamais. C'est la lueur du soleil qui
+   traverse le bas de l'écran et change de teinte selon l'heure.
+   Swipe horizontal pour parcourir les 5 jours.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --encre:  #ECF0F7;
+  --doux:   #7A879F;
+  --trait:  rgba(236, 240, 247, .10);
+  --accent: #ECF0F7;
+  --pluie:  #4E9FD6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { font-size: min(1.72vh, 1.02vw); }   /* une seule base, dérivée des deux axes */
+
+body {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;            /* sinon Chromium mange le geste horizontal */
+  color: var(--encre);
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-synthesis: none;
+  background: linear-gradient(178deg, #070910 0%, #0A0E16 60%, #0D121C 100%);
+}
+
+/* Tramage : sans ça, une lueur aussi large fait des bandes sur une dalle 8 bits */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+#ecran {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 3rem 4rem 2.2rem;
+  opacity: 0;
+  animation: entree 1.6s .3s cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes entree { from { opacity: 0; transform: translateY(.6rem); } to { opacity: 1; transform: none; } }
+
+/* ── Bandeau ─────────────────────────────────────────── */
+#bandeau {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.65rem;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--doux);
+}
+#lieu { transition: color .4s; }
+#lieu.futur { color: var(--accent); }
+#horloge {
+  font-family: 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 118, 'wght' 300;
+  font-size: 2.9rem;
+  letter-spacing: .01em;
+  color: var(--encre);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+/* ── Les pages : ce qui glisse ───────────────────────── */
+#pages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  will-change: transform, opacity;
+}
+#pages.glisse { transition: transform .34s cubic-bezier(.2,.7,.3,1), opacity .34s ease; }
+
+#principal {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5rem;
+}
+
+#icone { width: 17rem; height: 17rem; flex: none; }
+#icone svg { width: 100%; height: 100%; display: block; }
+
+#temperature {
+  font-variation-settings: 'wdth' 112, 'wght' 180;
+  font-size: 16.5rem;
+  line-height: .8;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: flex-start;
+}
+#temperature i {
+  font-style: normal;
+  font-size: .3em;
+  font-variation-settings: 'wdth' 100, 'wght' 250;
+  margin-top: .06em;
+  margin-left: .06em;
+  color: var(--doux);
+}
+/* Le minimum du jour, quand on regarde une prévision */
+#temperature b {
+  font-weight: normal;
+  font-size: .34em;
+  font-variation-settings: 'wdth' 100, 'wght' 200;
+  color: var(--doux);
+  margin-left: .34em;
+  align-self: flex-end;
+  margin-bottom: .06em;
+  letter-spacing: -.02em;
+}
+
+#condition {
+  font-variation-settings: 'wdth' 100, 'wght' 350;
+  font-size: 3.4rem;
+  margin-top: 1.6rem;
+  letter-spacing: -.005em;
+}
+
+#mesures {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.6rem;
+  color: var(--doux);
+  letter-spacing: .05em;
+}
+#mesures span { white-space: nowrap; }
+#mesures span + span::before { content: '·'; margin-right: 2rem; opacity: .45; }
+
+/* ── Modules : les notifications dynamiques ─────────────
+   Pas de boîte : ce design n'a aucun cadre nulle part — tout
+   est typographie posée sur le noir. Le module s'accroche donc
+   au bord droit, en miroir de la température, sur le même axe
+   optique que le grand chiffre. */
+#principal { position: relative; }
+#modules {
+  display: none;
+  position: absolute;
+  top: 44%;
+  right: 0;
+  transform: translateY(-50%);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.1rem;
+  padding: 1.6rem 0 1.6rem 3rem;   /* zone de contact généreuse pour le doigt, invisible */
+  text-align: right;
+  cursor: pointer;
+}
+#modules.visible { display: flex; }
+#modules-corps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .8rem;
+  transition: opacity .22s ease;
+}
+#modules-corps .label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.3rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--doux);
+}
+#modules-corps .valeur {
+  font-variation-settings: 'wdth' 110, 'wght' 230;
+  font-size: 4.8rem;
+  line-height: 1;
+  letter-spacing: -.015em;
+  color: var(--encre);
+}
+#modules-corps .valeur::after { content: '›'; margin-left: .7rem; opacity: .4; color: var(--doux); }
+#modules-points {
+  display: flex;
+  gap: .55rem;
+}
+#modules-points span {
+  width: .55rem;
+  height: .55rem;
+  border-radius: 1rem;
+  background: var(--encre);
+  opacity: .22;
+  transition: width .3s cubic-bezier(.2,.7,.3,1), opacity .3s, background .3s;
+}
+#modules-points span.actif {
+  width: 1.6rem;
+  opacity: 1;
+  background: var(--accent);
+}
+
+/* ── Le ruban ────────────────────────────────────────── */
+#ruban { flex: none; height: 13.5rem; }
+#ruban svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.heure {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 17px;
+  letter-spacing: .12em;
+  fill: var(--doux);
+}
+.degre {
+  font-family: 'Archivo', sans-serif;
+  font-size: 19px;
+  font-variation-settings: 'wdth' 108, 'wght' 500;
+  fill: var(--encre);
+}
+
+/* ── Les jours ───────────────────────────────────────── */
+#jours {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: .9rem;
+  height: 2.2rem;
+  margin-top: .6rem;
+}
+#jours span {
+  width: .7rem;
+  height: .7rem;
+  border-radius: 1rem;
+  background: var(--encre);
+  opacity: .22;
+  transition: width .3s cubic-bezier(.2,.7,.3,1), opacity .3s, background .3s;
+}
+#jours span.actif {
+  width: 2.6rem;
+  opacity: 1;
+  background: var(--accent);
+}
+
+/* ── Panne ───────────────────────────────────────────── */
+#panne {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.6rem;
+  background: #070910;
+  text-align: center;
+}
+#panne.visible { display: flex; }
+#panne h1 { font-variation-settings: 'wdth' 108, 'wght' 300; font-size: 4rem; letter-spacing: -.02em; }
+#panne p { font-family: 'IBM Plex Mono', monospace; font-size: 1.7rem; color: var(--doux); letter-spacing: .06em; }
+
+/* ── Fenêtre : détail carburant / vacances ──────────────
+   S'ouvre au clic sur une puce, se ferme au swipe — comme
+   les jours, mais dans l'autre sens : on revient au présent. */
+#fenetre {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: #070910;
+  padding: 3.4rem 4.2rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1.2rem);
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,.7,.3,1);
+  overflow-y: auto;
+}
+#fenetre.ouverte { opacity: 1; pointer-events: auto; transform: none; }
+/* Le swipe suffit à qui connaît déjà le kiosque ; la croix est là pour tout le monde d'autre. */
+#fenetre .fermer {
+  position: absolute;
+  top: 1.5rem;
+  right: 2.2rem;
+  background: none;
+  border: none;
+  color: var(--doux);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.9rem;
+  line-height: 1;
+  padding: .8rem;
+  cursor: pointer;
+}
+#fenetre h2 {
+  font-variation-settings: 'wdth' 108, 'wght' 300;
+  font-size: 2.6rem;
+  letter-spacing: -.01em;
+  margin-bottom: .3rem;
+}
+#fenetre .sous {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.3rem;
+  letter-spacing: .06em;
+  color: var(--doux);
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+}
+#fenetre .ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--trait);
+  font-size: 1.5rem;
+}
+#fenetre .ligne:last-of-type { border-bottom: 1px solid var(--trait); }
+#fenetre .ligne .principal { color: var(--encre); }
+#fenetre .ligne .detail {
+  color: var(--doux);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.2rem;
+  letter-spacing: .04em;
+  text-align: right;
+  white-space: nowrap;
+}
+#fenetre .ligne.actuel .principal { color: var(--accent); }
+#fenetre .retour {
+  margin-top: 2.4rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--doux);
+  opacity: .6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #ecran { animation: none; opacity: 1; transform: none; }
+  #pages.glisse { transition: opacity .2s; }
+  #jours span { transition: none; }
+  #fenetre { transition: opacity .2s; }
+}
+</style>
+</head>
+<body>
+
+<div id="ecran">
+  <header id="bandeau">
+    <div id="lieu">—</div>
+    <div id="horloge">--:--</div>
+  </header>
+
+  <div id="pages">
+    <main id="principal">
+      <div id="icone"></div>
+      <div>
+        <div id="temperature">--<i>°</i></div>
+        <div id="condition">Connexion…</div>
+        <div id="mesures"></div>
+      </div>
+      <div id="modules">
+        <div id="modules-corps"></div>
+        <div id="modules-points"></div>
+      </div>
+    </main>
+    <section id="ruban"></section>
+  </div>
+
+  <nav id="jours"></nav>
+</div>
+
+<div id="panne">
+  <h1>Pas de données météo</h1>
+  <p>Vérifie la connexion réseau du Raspberry Pi</p>
+</div>
+
+<div id="fenetre">
+  <button type="button" class="fermer" aria-label="Fermer">✕</button>
+  <div id="fenetre-corps"></div>
+</div>
+
+<script>
+/* ═════════════════════════════════════════════════════════════
+   1. RÉGLAGES
+   ═════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  lieu:      "Vaugrigneuse",
+  latitude:  48.6244352,
+  longitude: 2.1195366,
+  fuseau:    "Europe/Paris",
+
+  // 'ciel' : la lueur suit le soleil et change de teinte
+  // 'nuit' : noir constant, une seule encre froide. Zéro couleur.
+  ambiance:  'ciel',
+
+  nbJours:   5,               // jours parcourables au swipe (max 16)
+  retour:    45 * 1000,       // sans contact, on revient à aujourd'hui
+  rafraichir: 10 * 60 * 1000,
+
+  carburant: { actif: true, type: 'sp98', rayon: 12000 },   // rayon en mètres
+  vacances:  { actif: true, academie: 'Versailles', zone: 'Zone C' },
+};
+
+// Aperçu : ?heure=6.5 fige l'horloge à 6 h 30 pour voir une ambiance.
+//          ?ambiance=nuit force le mode sombre intégral.
+const ARGS = new URLSearchParams(location.search);
+if (ARGS.has('ambiance')) CONFIG.ambiance = ARGS.get('ambiance');
+
+function maintenant() {
+  const n = new Date();
+  if (ARGS.has('heure')) {
+    const h = parseFloat(ARGS.get('heure'));
+    n.setHours(Math.floor(h), Math.round((h % 1) * 60), 0, 0);
+  }
+  return n;
+}
+
+/* ═════════════════════════════════════════════════════════════
+   2. COULEUR — OKLCH → sRGB
+   ═════════════════════════════════════════════════════════════
+   Mélanger deux teintes en RGB traverse le gris. En OKLCH on
+   interpole la teinte sur le cercle, donc bleu → orange passe par
+   le violet et le rouge, comme un vrai ciel, et jamais par la boue.
+*/
+function oklch(L, C, H, a = 1) {
+  const h = H * Math.PI / 180;
+  const x = C * Math.cos(h), y = C * Math.sin(h);
+  const l = (L + 0.3963377774*x + 0.2158037573*y) ** 3;
+  const m = (L - 0.1055613458*x - 0.0638541728*y) ** 3;
+  const s = (L - 0.0894841775*x - 1.2914855480*y) ** 3;
+  const canal = v => {
+    v = v <= 0.0031308 ? 12.92*v : 1.055 * Math.pow(Math.max(v, 0), 1/2.4) - 0.055;
+    return Math.round(Math.min(1, Math.max(0, v)) * 255);
+  };
+  const r  = canal( 4.0767416621*l - 3.3077115913*m + 0.2309699292*s);
+  const g  = canal(-1.2684380046*l + 2.6097574011*m - 0.3413193965*s);
+  const bl = canal(-0.0041960863*l - 0.7034186147*m + 1.7076147010*s);
+  return `rgba(${r},${g},${bl},${a.toFixed(3)})`;
+}
+
+const lerp  = (a, b, t) => a + (b - a) * t;
+// Teinte : toujours par le plus court chemin sur le cercle
+const lerpH = (a, b, t) => { let d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; };
+
+/* Les phases. Ancrées au lever (LEV), au midi solaire (MID) ou au
+   coucher (COU). `i` est l'intensité de la lueur, pas la clarté du
+   fond : le fond, lui, reste noir.
+
+   L/C/H = la lueur.  aC/aH = l'accent (soleil, lune, point « maintenant »).
+   Les deux sont séparés exprès : la lueur a le droit d'être magenta au
+   crépuscule — c'est ce que fait un vrai ciel — mais l'accent, lui, reste
+   dans une bande chaude quand le soleil est levé et froide la nuit.
+   Sinon on se retrouve avec un croissant de lune rose fluo. */
+const PHASES = [
+  { ref:'LEV', min: -70, L:.55, C:.045, H:265, i:.05, aC:.055, aH:258 },  // nuit
+  { ref:'LEV', min: -25, L:.55, C:.130, H:322, i:.20, aC:.060, aH:285 },  // première lueur
+  { ref:'LEV', min:  15, L:.72, C:.170, H: 42, i:.44, aC:.130, aH: 45 },  // lever
+  { ref:'LEV', min:  90, L:.86, C:.085, H: 68, i:.30, aC:.115, aH: 60 },  // matin
+  { ref:'MID', min:   0, L:.95, C:.045, H: 82, i:.22, aC:.100, aH: 70 },  // plein jour
+  { ref:'COU', min: -90, L:.86, C:.085, H: 62, i:.30, aC:.115, aH: 58 },  // après-midi
+  { ref:'COU', min: -15, L:.70, C:.180, H: 34, i:.47, aC:.130, aH: 38 },  // couchant
+  { ref:'COU', min:  25, L:.52, C:.140, H:352, i:.22, aC:.070, aH:300 },  // crépuscule
+  { ref:'COU', min:  70, L:.55, C:.045, H:265, i:.05, aC:.055, aH:258 },  // nuit
+];
+
+const SOCLE = 'linear-gradient(178deg,#070910 0%,#0A0E16 60%,#0D121C 100%)';
+
+/* La lueur suit TOUJOURS l'heure réelle, jamais le jour affiché.
+   Swiper vers dimanche ne doit pas déclencher une aurore dans le salon. */
+function eclairer(n, lever, coucher) {
+  if (CONFIG.ambiance === 'nuit' || !lever || !coucher) {
+    document.body.style.background = SOCLE;
+    document.documentElement.style.setProperty('--accent', '#C6D4E8');
+    return;
+  }
+
+  const midi  = new Date((lever.getTime() + coucher.getTime()) / 2);
+  const ancre = { LEV: lever, COU: coucher, MID: midi };
+  const pts = PHASES.map(p => ({ ...p, t: ancre[p.ref].getTime() + p.min * 60000 }))
+                    .sort((a, b) => a.t - b.t);
+
+  const t = n.getTime();
+  let a = pts[0], b = pts[0], k = 0;
+  if (t >= pts[pts.length-1].t) a = b = pts[pts.length-1];
+  else if (t > pts[0].t) {
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (t <= pts[i+1].t) { a = pts[i]; b = pts[i+1]; k = (t - a.t) / (b.t - a.t); break; }
+    }
+  }
+
+  const L = lerp(a.L, b.L, k), C = lerp(a.C, b.C, k);
+  const H = lerpH(a.H, b.H, k), i = lerp(a.i, b.i, k);
+
+  // La lueur se place là où le soleil est vraiment dans son arc.
+  // Avant le lever elle attend à gauche, après le coucher elle sort à droite.
+  const course = (t - lever.getTime()) / (coucher.getTime() - lever.getTime());
+  const x = (Math.min(1.12, Math.max(-.12, course)) * 100).toFixed(1);
+
+  document.body.style.background = [
+    `radial-gradient(52% 62% at ${x}% 108%, ${oklch(L, C, H, i)} 0%, ${oklch(L, C*.8, H, i*.34)} 42%, transparent 74%)`,
+    `radial-gradient(150% 130% at 50% 126%, ${oklch(L, C*.55, H, i*.24)} 0%, transparent 68%)`,
+    SOCLE,
+  ].join(',');
+
+  document.documentElement.style.setProperty('--accent',
+    oklch(.84, lerp(a.aC, b.aC, k), lerpH(a.aH, b.aH, k)));
+}
+
+/* ═════════════════════════════════════════════════════════════
+   3. ICÔNES
+   ═════════════════════════════════════════════════════════════ */
+const svg = c => `<svg viewBox="0 0 64 64" fill="currentColor">${c}</svg>`;
+
+const RAYONS = (cx, cy, r1, r2) => Array.from({length: 8}, (_, i) => {
+  const a = i * Math.PI / 4;
+  return `<line x1="${(cx+Math.cos(a)*r1).toFixed(1)}" y1="${(cy+Math.sin(a)*r1).toFixed(1)}"
+                x2="${(cx+Math.cos(a)*r2).toFixed(1)}" y2="${(cy+Math.sin(a)*r2).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round"/>`;
+}).join('');
+
+const NUAGE = (dx=0, dy=0, s=1) => `<g transform="translate(${dx},${dy}) scale(${s})" opacity=".92">
+  <circle cx="24" cy="34" r="10"/><circle cx="37" cy="29" r="13"/>
+  <circle cx="46" cy="37" r="9"/><rect x="19" y="35" width="32" height="11" rx="5.5"/>
+</g>`;
+
+const GOUTTES = n => Array.from({length: n}, (_, i) =>
+  `<line x1="${25 + i*8}" y1="51" x2="${21 + i*8}" y2="60"
+         stroke="var(--pluie)" stroke-width="3.4" stroke-linecap="round"/>`).join('');
+
+const FLOCONS = (n, f = 'currentColor') => Array.from({length: n}, (_, i) =>
+  `<circle cx="${25 + i*8}" cy="56" r="2.6" fill="${f}"/>`).join('');
+
+const CROISSANT = (x, y, s) =>
+  `<g transform="translate(${x},${y}) scale(${s}) translate(-12,-12)" fill="var(--accent)">
+     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></g>`;
+
+const ICONES = {
+  soleil:        svg(`<circle cx="32" cy="32" r="12" fill="var(--accent)"/>${RAYONS(32,32,17,23)}`),
+  lune:          svg(CROISSANT(32, 32, 2.35)),
+  soleil_nuages: svg(`<circle cx="24" cy="22" r="8.5" fill="var(--accent)"/>${RAYONS(24,22,13,17.5)}${NUAGE(4,8,.92)}`),
+  lune_nuages:   svg(`${CROISSANT(23, 21, 1.35)}${NUAGE(4,8,.92)}`),
+  nuages:        svg(NUAGE(0, 2)),
+  brouillard:    svg(`<g opacity=".55">${NUAGE(0,-3)}</g>
+                      <g stroke="currentColor" stroke-width="3.4" stroke-linecap="round">
+                        <line x1="17" y1="49" x2="47" y2="49"/><line x1="22" y1="57" x2="52" y2="57"/></g>`),
+  bruine:        svg(`${NUAGE(0,-4)}${FLOCONS(3, 'var(--pluie)')}`),
+  pluie:         svg(`${NUAGE(0,-4)}${GOUTTES(3)}`),
+  averses:       svg(`<circle cx="20" cy="19" r="6.5" fill="var(--accent)"/>${RAYONS(20,19,10.5,14)}${NUAGE(5,2,.88)}${GOUTTES(2)}`),
+  neige:         svg(`${NUAGE(0,-4)}${FLOCONS(3)}`),
+  gresil:        svg(`${NUAGE(0,-4)}${FLOCONS(3, 'var(--pluie)')}`),
+  orage:         svg(`${NUAGE(0,-6)}<path d="M35 45 L26 58 h6 l-3 9 l12 -14 h-6 z" fill="var(--accent)"/>`),
+};
+
+function meteo(code, jour) {
+  const t = (nom, icn) => ({ nom, icone: ICONES[icn] });
+  switch (true) {
+    case code === 0:                return t('Ciel dégagé',        jour ? 'soleil' : 'lune');
+    case code === 1:                return t('Peu nuageux',        jour ? 'soleil_nuages' : 'lune_nuages');
+    case code === 2:                return t('Nuages épars',       jour ? 'soleil_nuages' : 'lune_nuages');
+    case code === 3:                return t('Ciel couvert',       'nuages');
+    case [45,48].includes(code):    return t('Brouillard',         'brouillard');
+    case [51,53,55].includes(code): return t('Bruine',             'bruine');
+    case [56,57].includes(code):    return t('Bruine verglaçante', 'gresil');
+    case code === 61:               return t('Pluie faible',       'pluie');
+    case code === 63:               return t('Pluie',              'pluie');
+    case code === 65:               return t('Pluie forte',        'pluie');
+    case [66,67].includes(code):    return t('Pluie verglaçante',  'gresil');
+    case code === 71:               return t('Neige faible',       'neige');
+    case code === 73:               return t('Neige',              'neige');
+    case code === 75:               return t('Neige forte',        'neige');
+    case code === 77:               return t('Grains de neige',    'neige');
+    case [80,81].includes(code):    return t('Averses',            'averses');
+    case code === 82:               return t('Fortes averses',     'pluie');
+    case [85,86].includes(code):    return t('Averses de neige',   'neige');
+    case code === 95:               return t('Orage',              'orage');
+    case [96,99].includes(code):    return t('Orage et grêle',     'orage');
+    default:                        return t('—',                  'nuages');
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   4. LE RUBAN
+   ═════════════════════════════════════════════════════════════
+   Aujourd'hui : les 12 h à venir, avec le point « maintenant ».
+   Les autres jours : la journée entière, 00 h → 23 h.
+*/
+function tracerRuban(pts, lever, coucher, aujourdhui) {
+  const L = 1000, H = 145;
+  const haut = 14, bas = 68, sol = 104, yTexte = 133;
+  const marge = 40;
+
+  const T = pts.map(p => p.temp);
+  let tmin = Math.min(...T), tmax = Math.max(...T);
+  if (tmax - tmin < 3) { const c = (tmax + tmin) / 2; tmin = c - 1.5; tmax = c + 1.5; }
+
+  const X = i => marge + i * (L - marge*2) / (pts.length - 1);
+  const Y = t => bas - (t - tmin) / (tmax - tmin) * (bas - haut);
+
+  // Lissage Catmull-Rom → Bézier
+  const co = pts.map((p, i) => [X(i), Y(p.temp)]);
+  let d = `M${co[0][0]},${co[0][1]}`;
+  for (let i = 0; i < co.length - 1; i++) {
+    const p0 = co[i-1] || co[i], p1 = co[i], p2 = co[i+1], p3 = co[i+2] || co[i+1];
+    d += ` C${p1[0]+(p2[0]-p0[0])/6},${p1[1]+(p2[1]-p0[1])/6} ${p2[0]-(p3[0]-p1[0])/6},${p2[1]-(p3[1]-p1[1])/6} ${p2[0]},${p2[1]}`;
+  }
+
+  // Barres de pluie : au-delà de 10 % seulement, sinon c'est du bruit
+  const large = pts.length > 15 ? 7 : 10;
+  const pluie = pts.map((p, i) => p.pluie > 10
+    ? `<rect x="${X(i)-large/2}" y="${sol - p.pluie/100*26}" width="${large}" height="${p.pluie/100*26}"
+             rx="2.5" fill="var(--pluie)" opacity=".5"/>` : '').join('');
+
+  // 24 points, c'est une étiquette sur 4 ; 13 points, une sur 3
+  const pas = pts.length > 15 ? 4 : 3;
+  const heures = pts.map((p, i) => i % pas === 0
+    ? `<text class="heure" x="${X(i)}" y="${yTexte}"
+             text-anchor="${i === 0 ? 'start' : 'middle'}">${
+        aujourdhui && i === 0 ? 'MAINT.' : String(p.date.getHours()).padStart(2,'0') + 'H'}</text>` : '').join('');
+
+  // On n'étiquette que le plus chaud et le plus froid. La forme dit le reste.
+  const iMax = T.indexOf(tmax), iMin = T.indexOf(tmin);
+  const et = i => `<text class="degre" x="${X(i)}" y="${Y(T[i]) + (i === iMax ? -14 : 24)}"
+                     text-anchor="middle">${Math.round(T[i])}°</text>`;
+  const extremes = iMax === iMin ? '' : et(iMax) + et(iMin);
+
+  const jalon = (date, glyphe) => {
+    if (!date || date < pts[0].date || date > pts[pts.length-1].date) return '';
+    const x = marge + (date - pts[0].date) / (pts[pts.length-1].date - pts[0].date) * (L - marge*2);
+    return `<line x1="${x}" y1="6" x2="${x}" y2="${sol}" stroke="var(--accent)"
+                  stroke-width="1.2" stroke-dasharray="2 6" opacity=".55"/>
+            <text class="heure" x="${x}" y="${yTexte}" text-anchor="middle"
+                  fill="var(--accent)" opacity=".8">${glyphe}</text>`;
+  };
+
+  // Le point « maintenant » n'a de sens que sur aujourd'hui
+  const curseur = aujourdhui
+    ? `<circle cx="${X(0)}" cy="${Y(T[0])}" r="10" fill="var(--accent)" opacity=".22"/>
+       <circle cx="${X(0)}" cy="${Y(T[0])}" r="4.5" fill="var(--accent)"/>` : '';
+
+  document.getElementById('ruban').innerHTML = `
+    <svg viewBox="0 0 ${L} ${H}">
+      <defs>
+        <linearGradient id="sousCourbe" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="currentColor" stop-opacity=".16"/>
+          <stop offset="1" stop-color="currentColor" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="0" y1="${sol}" x2="${L}" y2="${sol}" stroke="var(--trait)" stroke-width="1"/>
+      ${jalon(lever, '↑')}${jalon(coucher, '↓')}
+      <path d="${d} L${X(pts.length-1)},${sol} L${X(0)},${sol} Z" fill="url(#sousCourbe)" stroke="none"/>
+      ${pluie}
+      <path d="${d}" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+      ${curseur}
+      ${extremes}
+      ${heures}
+    </svg>`;
+}
+
+/* ═════════════════════════════════════════════════════════════
+   5. DONNÉES — Open-Meteo, sans clé ni compte
+   ═════════════════════════════════════════════════════════════ */
+const URL = 'https://api.open-meteo.com/v1/forecast?' + new URLSearchParams({
+  latitude:  CONFIG.latitude,
+  longitude: CONFIG.longitude,
+  timezone:  CONFIG.fuseau,
+  current:   'temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day',
+  hourly:    'temperature_2m,precipitation_probability',
+  daily:     'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,wind_speed_10m_max',
+  forecast_days: CONFIG.nbJours,
+});
+
+// Open-Meteo renvoie « 2026-07-17T14:00 » sans fuseau : on le lit en heure locale
+const lire = s => { const [d, h] = s.split('T'); const [Y,M,J] = d.split('-'); const [hh,mm] = h.split(':');
+                    return new Date(+Y, +M-1, +J, +hh, +mm); };
+
+let etat = null;
+let vue  = 0;              // 0 = aujourd'hui
+let minuteur = null;       // retour auto à aujourd'hui
+
+async function charger() {
+  try {
+    const r = await fetch(URL, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+
+    // Les heures d'un jour donné, repérées par le préfixe de date
+    const heuresDe = cle => j.hourly.time
+      .map((t, i) => ({ t, i }))
+      .filter(o => o.t.startsWith(cle))
+      .map(o => ({ date: lire(o.t), temp: j.hourly.temperature_2m[o.i],
+                   pluie: j.hourly.precipitation_probability[o.i] ?? 0 }))
+      .filter(p => p.temp !== null);
+
+    const jours = j.daily.time.map((cle, n) => ({
+      date:    lire(cle + 'T12:00'),
+      code:    j.daily.weather_code[n],
+      max:     Math.round(j.daily.temperature_2m_max[n]),
+      min:     Math.round(j.daily.temperature_2m_min[n]),
+      pluie:   j.daily.precipitation_probability_max[n] ?? 0,
+      vent:    Math.round(j.daily.wind_speed_10m_max[n]),
+      lever:   lire(j.daily.sunrise[n]),
+      coucher: lire(j.daily.sunset[n]),
+      pts:     heuresDe(cle),
+    }));
+
+    // Aujourd'hui est un cas à part : conditions instantanées, et le
+    // ruban part de maintenant au lieu de minuit.
+    const depart = maintenant().getTime() - 3600e3;
+    const i0 = Math.max(0, j.hourly.time.findIndex(t => lire(t) >= new Date(depart)));
+    Object.assign(jours[0], {
+      code:     j.current.weather_code,
+      temp:     Math.round(j.current.temperature_2m),
+      ressenti: Math.round(j.current.apparent_temperature),
+      humidite: j.current.relative_humidity_2m,
+      vent:     Math.round(j.current.wind_speed_10m),
+      jour:     j.current.is_day === 1,
+      pts: j.hourly.time.slice(i0, i0 + 13).map((t, k) => ({
+        date:  lire(t),
+        temp:  j.hourly.temperature_2m[i0 + k],
+        pluie: j.hourly.precipitation_probability[i0 + k] ?? 0,
+      })).filter(p => p.temp !== null),
+    });
+
+    etat = { jours, lever: jours[0].lever, coucher: jours[0].coucher };
+    vue = Math.min(vue, jours.length - 1);
+
+    document.getElementById('panne').classList.remove('visible');
+    document.getElementById('jours').innerHTML =
+      jours.map((_, i) => `<span class="${i === vue ? 'actif' : ''}"></span>`).join('');
+
+    battement();
+    peindre();
+  } catch (e) {
+    console.error('météo', e);
+    if (!etat) document.getElementById('panne').classList.add('visible');
+  }
+}
+
+const fmtJour = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: CONFIG.fuseau });
+const fmtHM   = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: CONFIG.fuseau });
+
+function peindre() {
+  if (!etat) return;
+  const d = etat.jours[vue];
+  const aujourdhui = vue === 0;
+
+  // Sur aujourd'hui l'icône suit is_day ; sur une prévision, il fait jour
+  const solaire = ARGS.has('heure')
+    ? (maintenant() > etat.lever && maintenant() < etat.coucher)
+    : d.jour;
+  const m = meteo(d.code, aujourdhui ? solaire : true);
+
+  document.getElementById('icone').innerHTML = m.icone;
+  document.getElementById('condition').textContent = m.nom;
+
+  document.getElementById('temperature').innerHTML = aujourdhui
+    ? `${d.temp}<i>°</i>`
+    : `${d.max}<i>°</i><b>${d.min}°</b>`;
+
+  document.getElementById('mesures').innerHTML = (aujourdhui
+    ? [`ressenti ${d.ressenti}°`, `${d.max}° / ${d.min}°`, `vent ${d.vent} km/h`, `humidité ${d.humidite} %`]
+    : [`pluie ${d.pluie} %`, `vent ${d.vent} km/h`, `lever ${fmtHM.format(d.lever)}`, `coucher ${fmtHM.format(d.coucher)}`]
+  ).map(t => `<span>${t}</span>`).join('');
+
+  if (d.pts.length > 2) tracerRuban(d.pts, d.lever, d.coucher, aujourdhui);
+
+  // Le bandeau annonce le jour REGARDÉ, pas le jour courant
+  document.getElementById('lieu').textContent = `${CONFIG.lieu} · ${fmtJour.format(d.date)}`;
+  document.getElementById('lieu').classList.toggle('futur', !aujourdhui);
+
+  document.querySelectorAll('#jours span').forEach((s, i) => s.classList.toggle('actif', i === vue));
+}
+
+/* ═════════════════════════════════════════════════════════════
+   6. LE SWIPE
+   ═════════════════════════════════════════════════════════════ */
+const pages = document.getElementById('pages');
+let x0 = null, y0 = null, dx = 0, dy = 0, geste = null;
+
+function versJour(n) {
+  if (!etat) return;
+  const cible = Math.min(etat.jours.length - 1, Math.max(0, n));
+  if (cible === vue) return snap();
+
+  const sens = cible > vue ? -1 : 1;
+  vue = cible;
+
+  // Sortie dans le sens du doigt, puis entrée depuis l'autre bord
+  pages.classList.add('glisse');
+  pages.style.transform = `translateX(${sens * 4}rem)`;
+  pages.style.opacity = '0';
+
+  setTimeout(() => {
+    peindre();
+    pages.classList.remove('glisse');
+    pages.style.transform = `translateX(${-sens * 4}rem)`;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      pages.classList.add('glisse');
+      pages.style.transform = 'translateX(0)';
+      pages.style.opacity = '1';
+    }));
+  }, 170);
+
+  reveil();
+}
+
+function snap() {
+  pages.classList.add('glisse');
+  pages.style.transform = 'translateX(0)';
+  pages.style.opacity = '1';
+}
+
+// Toute interaction relance le compte à rebours du retour à aujourd'hui.
+// Sinon on consulte mardi, on s'en va, et l'écran affiche mardi pendant 3 jours.
+function reveil() {
+  clearTimeout(minuteur);
+  if (vue !== 0) minuteur = setTimeout(() => versJour(0), CONFIG.retour);
+}
+
+addEventListener('pointerdown', e => {
+  if (e.target.closest('#modules')) { x0 = null; return; }   // la card a son propre carrousel (auto), pas celui des jours
+  x0 = e.clientX; y0 = e.clientY; dx = 0; dy = 0; geste = null;
+  pages.classList.remove('glisse');
+  reveil();
+});
+
+addEventListener('pointermove', e => {
+  if (x0 === null) return;
+  dx = e.clientX - x0;
+  dy = e.clientY - y0;
+  if (document.body.classList.contains('fenetre-ouverte')) return;   // la fenêtre ne glisse pas sous le doigt
+
+  // On décide une fois pour toutes si le geste est horizontal
+  if (geste === null && Math.abs(dx) + Math.abs(dy) > 10)
+    geste = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+  if (geste !== 'h') return;
+
+  // Résistance aux extrémités : le mur se sent au doigt
+  const mur = (dx > 0 && vue === 0) || (dx < 0 && etat && vue === etat.jours.length - 1);
+  const d = dx * (mur ? .12 : .38);
+  pages.style.transform = `translateX(${d}px)`;
+  pages.style.opacity = String(Math.max(.35, 1 - Math.abs(d) / 260));
+});
+
+addEventListener('pointerup', () => {
+  if (x0 === null) return;
+  if (document.body.classList.contains('fenetre-ouverte')) {
+    if (Math.abs(dx) > 40 || Math.abs(dy) > 40) fermerFenetre();
+    x0 = y0 = null; geste = null;
+    return;
+  }
+  if (geste === 'h' && Math.abs(dx) > 60) versJour(vue + (dx < 0 ? 1 : -1));
+  else snap();
+  x0 = y0 = null; geste = null;
+});
+addEventListener('pointercancel', () => { snap(); x0 = y0 = null; geste = null; });
+
+// Un clavier branché, ça dépanne pour tester
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') versJour(vue + 1);
+  if (e.key === 'ArrowLeft')  versJour(vue - 1);
+  if (e.key === 'Home')       versJour(0);
+  if (e.key === 'Escape' && document.body.classList.contains('fenetre-ouverte')) fermerFenetre();
+});
+
+/* ═════════════════════════════════════════════════════════════
+   7. BOUCLE
+   ═════════════════════════════════════════════════════════════ */
+function battement() {
+  const n = maintenant();
+  document.getElementById('horloge').textContent = fmtHM.format(n);
+  if (!etat) document.getElementById('lieu').textContent = `${CONFIG.lieu} · ${fmtJour.format(n)}`;
+  if (etat) eclairer(n, etat.lever, etat.coucher);
+  peindreModules();   // « intéressant » dépend de l'heure (ex. le compte à rebours des vacances) : on le réévalue à chaque battement
+}
+
+/* ═════════════════════════════════════════════════════════════
+   8. MODULES
+   Un seul container dans le trou à côté de la température.
+   Chaque module sait charger sa donnée, dire s'il est « intéressant »
+   en ce moment, se résumer en une ligne pour le carrousel, et se
+   détailler dans la fenêtre. En ajouter un = ajouter une entrée ici,
+   rien d'autre à toucher.
+   ═════════════════════════════════════════════════════════════ */
+const distanceKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371, rad = d => d * Math.PI / 180;
+  const dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const fmtPrix = p => p.toFixed(2).replace('.', ',') + ' €';
+const fmtDateCourt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: CONFIG.fuseau });
+const joursEntre = (a, b) => Math.round((b - a) / 86400000);
+
+// « Vacances de la Toussaint » → « TOUSSAINT ». Le module n'a pas la place pour le reste.
+const nomCourt = nom => nom.replace(/^(Début des )?Vacances (de la |de l'|d'|de )?/i, '').toUpperCase();
+
+let carburantEtat = null;
+let vacancesEtat  = null;
+
+async function chargerCarburant() {
+  if (!CONFIG.carburant.actif) return;
+  try {
+    const p = new URLSearchParams({
+      dataset: 'prix-des-carburants-en-france-flux-instantane-v2',
+      'geofilter.distance': `${CONFIG.latitude},${CONFIG.longitude},${CONFIG.carburant.rayon}`,
+      rows: 25,
+    });
+    const r = await fetch('https://data.economie.gouv.fr/api/records/1.0/search/?' + p, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const type = CONFIG.carburant.type;
+
+    carburantEtat = j.records
+      .map(rec => rec.fields)
+      .filter(f => f[`${type}_prix`] != null)
+      .map(f => ({
+        adresse:  f.adresse, ville: f.ville,
+        prix:     f[`${type}_prix`],
+        distance: f.geom ? distanceKm(CONFIG.latitude, CONFIG.longitude, f.geom[0], f.geom[1]) : null,
+      }))
+      .sort((a, b) => a.prix - b.prix);
+
+    peindreModules();
+  } catch (e) { console.error('carburant', e); }
+}
+
+async function chargerVacances() {
+  if (!CONFIG.vacances.actif) return;
+  try {
+    const p = new URLSearchParams({
+      dataset: 'fr-en-calendrier-scolaire',
+      q: `location:"${CONFIG.vacances.academie}" AND zones:"${CONFIG.vacances.zone}"`,
+      sort: 'start_date',
+      rows: 40,
+    });
+    const r = await fetch('https://data.education.gouv.fr/api/records/1.0/search/?' + p, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+
+    const vu = new Set();
+    vacancesEtat = j.records
+      .map(rec => rec.fields)
+      .filter(f => f.start_date && f.end_date && /^(Vacances|Début des Vacances)/i.test(f.description || ''))
+      .map(f => ({ nom: f.description, debut: new Date(f.start_date), fin: new Date(f.end_date) }))
+      .filter(x => { const cle = x.nom + x.debut.toISOString().slice(0, 10);
+                     return vu.has(cle) ? false : (vu.add(cle), true); })
+      .sort((a, b) => a.debut - b.debut);
+
+    peindreModules();
+  } catch (e) { console.error('vacances', e); }
+}
+
+// Chaque module : pret() = la donnée est là. interessant() = elle vaut la peine d'être montrée
+// maintenant (sinon la case reste vide plutôt que d'afficher un truc sans intérêt). ligne() nourrit
+// le carrousel. fenetre() nourrit le détail plein écran.
+const MODULES = [
+  {
+    id: 'carburant',
+    pret: () => !!(carburantEtat && carburantEtat.length),
+    interessant: () => true,   // le prix du plein est toujours utile
+    ligne: () => ({ label: `carburant · ${CONFIG.carburant.type}`, valeur: fmtPrix(carburantEtat[0].prix) }),
+    fenetre: () => `
+      <h2>Carburants</h2>
+      <div class="sous">${CONFIG.carburant.type} · ${CONFIG.lieu} et alentours</div>
+      ${carburantEtat.slice(0, 6).map((s, i) => `
+        <div class="ligne${i === 0 ? ' actuel' : ''}">
+          <div class="principal">${s.adresse}, ${s.ville}</div>
+          <div class="detail">${fmtPrix(s.prix)}${s.distance != null ? ` · ${s.distance.toFixed(1)} km` : ''}</div>
+        </div>`).join('')}`,
+  },
+  {
+    id: 'vacances',
+    pret: () => !!(vacancesEtat && vacancesEtat.length),
+    interessant: () => {
+      const n = maintenant();
+      if (vacancesEtat.some(p => p.debut <= n && n <= p.fin)) return true;
+      const prochaine = vacancesEtat.find(p => p.debut > n);
+      return !!prochaine && joursEntre(n, prochaine.debut) <= 21;   // inutile 4 mois à l'avance
+    },
+    ligne: () => {
+      const n = maintenant();
+      const actuelle  = vacancesEtat.find(p => p.debut <= n && n <= p.fin);
+      const prochaine = vacancesEtat.find(p => p.debut > n);
+      return actuelle
+        ? { label: nomCourt(actuelle.nom), valeur: `Reprise ${fmtDateCourt.format(actuelle.fin)}` }
+        : { label: nomCourt(prochaine.nom), valeur: `Dans ${joursEntre(n, prochaine.debut)} j` };
+    },
+    fenetre: () => {
+      const n = maintenant();
+      return `
+        <h2>Vacances scolaires</h2>
+        <div class="sous">${CONFIG.vacances.zone} · académie de ${CONFIG.vacances.academie}</div>
+        ${vacancesEtat.filter(p => p.fin >= n).slice(0, 5).map(p => `
+          <div class="ligne${p.debut <= n ? ' actuel' : ''}">
+            <div class="principal">${nomCourt(p.nom)}</div>
+            <div class="detail">${fmtDateCourt.format(p.debut)} → ${fmtDateCourt.format(p.fin)}</div>
+          </div>`).join('')}`;
+    },
+  },
+];
+
+let indexModule = 0;
+let moduleAffiche = '';   // empreinte du dernier rendu : on ne refait le fondu que si le contenu change
+
+const modulesQualifies = () => MODULES.filter(m => m.pret() && m.interessant());
+
+function peindreModules() {
+  const conteneur = document.getElementById('modules');
+  const corps = document.getElementById('modules-corps');
+  const points = document.getElementById('modules-points');
+  const qual = modulesQualifies();
+
+  if (!qual.length) { conteneur.classList.remove('visible'); moduleAffiche = ''; return; }
+  if (indexModule >= qual.length) indexModule = 0;
+  conteneur.classList.add('visible');
+  conteneur.dataset.module = qual[indexModule].id;
+
+  const { label, valeur } = qual[indexModule].ligne();
+  const empreinte = `${qual[indexModule].id}|${label}|${valeur}`;
+  if (empreinte !== moduleAffiche) {
+    moduleAffiche = empreinte;
+    corps.style.opacity = '0';
+    setTimeout(() => {
+      corps.innerHTML = `<span class="label">${label}</span><span class="valeur">${valeur}</span>`;
+      corps.style.opacity = '1';
+    }, 220);
+  }
+
+  points.innerHTML = qual.length > 1
+    ? qual.map((_, i) => `<span class="${i === indexModule ? 'actif' : ''}"></span>`).join('')
+    : '';
+}
+
+// Le carrousel tourne tout seul ; s'il n'y a qu'un module intéressant (ou zéro), il ne fait rien.
+setInterval(() => {
+  const qual = modulesQualifies();
+  if (qual.length < 2) return;
+  indexModule = (indexModule + 1) % qual.length;
+  peindreModules();
+}, 7000);
+
+/* ── La fenêtre ──────────────────────────────────────── */
+function ouvrirFenetre(id) {
+  const m = MODULES.find(mod => mod.id === id);
+  if (!m || !m.pret()) return;
+  document.getElementById('fenetre-corps').innerHTML = m.fenetre() + '<div class="retour">✕ ou glisser pour revenir</div>';
+  document.getElementById('fenetre').classList.add('ouverte');
+  document.body.classList.add('fenetre-ouverte');
+}
+
+function fermerFenetre() {
+  document.getElementById('fenetre').classList.remove('ouverte');
+  document.body.classList.remove('fenetre-ouverte');
+  versJour(0);
+}
+
+document.getElementById('modules').addEventListener('click', () => {
+  const qual = modulesQualifies();
+  if (qual[indexModule]) ouvrirFenetre(qual[indexModule].id);
+});
+document.querySelector('#fenetre .fermer').addEventListener('click', fermerFenetre);
+
+chargerCarburant();
+chargerVacances();
+setInterval(chargerCarburant, CONFIG.rafraichir);
+setInterval(chargerVacances, 6 * 60 * 60 * 1000);
+
+// Le bootstrap arrive après les déclarations de section 8 : battement() appelle
+// peindreModules(), qui a besoin de MODULES déjà initialisé.
+eclairer(maintenant(), null, null);   // socle immédiat, avant même les données
+battement();
+charger();
+setInterval(battement, 20_000);
+setInterval(charger, CONFIG.rafraichir);
+addEventListener('online', charger);
+</script>
+</body>
+</html>
