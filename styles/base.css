@@ -1,0 +1,51 @@
+/* Reset + variables globales */
+
+:root {
+  --encre:   #ECF0F7;
+  --doux:    #7A879F;
+  --trait:   rgba(236, 240, 247, .10);
+  --accent:  #ECF0F7;
+  --pluie:   #4E9FD6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: min(1.72vh, 1.02vw);
+}
+
+body {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  color: var(--encre);
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-synthesis: none;
+  background: linear-gradient(178deg, #070910 0%, #0A0E16 60%, #0D121C 100%);
+}
+
+/* Tramage : évite les bandes sur dalle 8 bits */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: .05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

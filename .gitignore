@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Développement
+node_modules/
+*.log
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+dist/
+build/
+
+# Cache
+.cache/
+*.tmp
