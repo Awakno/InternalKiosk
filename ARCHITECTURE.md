@@ -13,7 +13,9 @@ kiosk/
 │   ├── color.js          # OKLCH, interpolation couleurs
 │   ├── format.js         # Formatters (prix, dates, AQI)
 │   ├── fetch.js          # Fetch wrapper + cache
-│   └── dom.js            # Utilitaires DOM sûrs
+│   ├── dom.js            # Utilitaires DOM sûrs
+│   ├── icons.js          # Icônes météo SVG + mapping code→condition
+│   └── ruban.js          # Graphique SVG horaire (courbe + pluie + jalons)
 │
 ├── modules/
 │   ├── base.js           # Classe Module de base

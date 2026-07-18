@@ -3,17 +3,8 @@ import { CONFIG, fmtJour, fmtHM, maintenant } from '../config.js';
 import { fetchJSON } from '../lib/fetch.js';
 import { lireISO } from '../lib/format.js';
 import { oklch, lerp, lerpH } from '../lib/color.js';
-
-const ICONES = {
-  soleil:        '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="32" cy="32" r="12" fill="var(--accent)"/><g opacity=".8">'+Array.from({length:8},(_, i)=>{const a=i*Math.PI/4;return`<line x1="${(32+Math.cos(a)*17).toFixed(1)}" y1="${(32+Math.sin(a)*17).toFixed(1)}" x2="${(32+Math.cos(a)*23).toFixed(1)}" y2="${(32+Math.sin(a)*23).toFixed(1)}" stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round"/>`}).join('')+'</g></svg>',
-  lune:          '<svg viewBox="0 0 64 64" fill="var(--accent)"><g transform="translate(32, 32) scale(2.35) translate(-12,-12)"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></g></svg>',
-  soleil_nuages: '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="24" cy="22" r="8.5" fill="var(--accent)"/><line x1="24" y1="9" x2="24" y2="3" stroke="var(--accent)" stroke-width="2.8" stroke-linecap="round"/></svg>',
-  lune_nuages:   '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="23" cy="21" r="6.5" fill="var(--accent)"/></svg>',
-  nuages:        '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="24" cy="34" r="10"/><circle cx="37" cy="29" r="13"/><circle cx="46" cy="37" r="9"/></svg>',
-  pluie:         '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="24" cy="34" r="10" opacity=".7"/><line x1="25" y1="51" x2="21" y2="60" stroke="var(--pluie)" stroke-width="3.4" stroke-linecap="round"/></svg>',
-  neige:         '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="24" cy="34" r="10" opacity=".7"/><circle cx="25" cy="56" r="2.6"/></svg>',
-  orage:         '<svg viewBox="0 0 64 64" fill="currentColor"><circle cx="20" cy="19" r="6.5" fill="var(--accent)"/><path d="M35 45 L26 58 h6 l-3 9 l12 -14 h-6 z" fill="var(--accent)"/></svg>',
-};
+import { meteo } from '../lib/icons.js';
+import { tracerRuban } from '../lib/ruban.js';
 
 const PHASES = [
   { ref:'LEV', min: -70, L:.55, C:.045, H:265, i:.05, aC:.055, aH:258 },
@@ -86,20 +77,6 @@ export class WeatherModule extends Module {
     this.currentDay = Math.min(this.currentDay, jours.length - 1);
   }
 
-  meteo(code, jour) {
-    const t = (nom, icn) => ({ nom, icone: ICONES[icn] });
-    switch (true) {
-      case code === 0: return t('Ciel dégagé', jour ? 'soleil' : 'lune');
-      case code === 1 || code === 2: return t('Peu nuageux', jour ? 'soleil_nuages' : 'lune_nuages');
-      case code === 3: return t('Ciel couvert', 'nuages');
-      case [45, 48].includes(code): return t('Brouillard', 'nuages');
-      case [51, 53, 55, 61, 63, 65, 66, 67].includes(code): return t('Pluie', 'pluie');
-      case [71, 73, 75, 77, 80, 81, 82, 85, 86].includes(code): return t('Neige', 'neige');
-      case [95, 96, 99].includes(code): return t('Orage', 'orage');
-      default: return t('—', 'nuages');
-    }
-  }
-
   elairer(n) {
     if (!this.data || CONFIG.ambiance === 'nuit') {
       document.body.style.background = SOCLE;
@@ -152,7 +129,7 @@ export class WeatherModule extends Module {
   renderDetail() {
     if (!this.data) return '';
     const d = this.data[this.currentDay];
-    const m = this.meteo(d.code, this.currentDay === 0 ? d.jour : true);
+    const m = meteo(d.code, this.currentDay === 0 ? d.jour : true);
 
     const lines = this.currentDay === 0
       ? [`Ressenti ${d.ressenti}°`, `${d.max}° / ${d.min}°`, `Vent ${d.vent} km/h`, `Humidité ${d.humidite}%`]
@@ -168,7 +145,7 @@ export class WeatherModule extends Module {
   renderPage() {
     if (!this.data) return;
     const d = this.data[this.currentDay];
-    const m = this.meteo(d.code, this.currentDay === 0 ? d.jour : true);
+    const m = meteo(d.code, this.currentDay === 0 ? d.jour : true);
 
     document.getElementById('icone').innerHTML = m.icone;
     document.getElementById('condition').textContent = m.nom;
@@ -186,6 +163,10 @@ export class WeatherModule extends Module {
     document.getElementById('lieu').textContent = `${CONFIG.location.name} · ${fmtJour.format(d.date)}`;
     document.getElementById('lieu').classList.toggle('futur', this.currentDay !== 0);
     document.querySelectorAll('#jours span').forEach((s, i) => s.classList.toggle('actif', i === this.currentDay));
+
+    if (d.pts.length > 2) {
+      document.getElementById('ruban').innerHTML = tracerRuban(d.pts, d.lever, d.coucher, this.currentDay === 0);
+    }
   }
 
   goToDay(n) {

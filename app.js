@@ -8,9 +8,12 @@ import { createText, createDiv, clearAndAppend, safeHTML } from './lib/dom.js';
 
 // ───────────────────────────────────────── Initialisation ─────────────────────────────────────
 
+// La météo pilote l'écran principal directement (renderPage/goToDay/elairer) ;
+// elle ne fait PAS partie du petit carrousel latéral (celui-ci n'affiche que
+// les widgets secondaires, sinon la temp. dupliquée y perd son contexte
+// "aujourd'hui vs prévision" et affiche "undefined°" sur les jours futurs).
 const weather = new WeatherModule();
-const modules = [
-  weather,
+const widgets = [
   new FuelModule(),
   new HolidaysModule(),
   new AirQualityModule(),
@@ -107,7 +110,7 @@ document.addEventListener('keydown', e => {
 // ───────────────────────────────────────── Modules ─────────────────────────────────────
 
 function modulesQualifies() {
-  return modules.filter(m => m.isReady() && m.isRelevant());
+  return widgets.filter(m => m.isReady() && m.isRelevant());
 }
 
 function peindreModules() {
@@ -190,8 +193,11 @@ function battement() {
 // ───────────────────────────────────────── Bootstrap ─────────────────────────────────────
 
 async function init() {
-  // Charger toutes les données
-  const charges = modules.map(m => m.load().catch(e => console.error(m.id, e)));
+  // Charger toutes les données (météo + widgets, en parallèle)
+  const charges = [
+    weather.load().catch(e => console.error('weather', e)),
+    ...widgets.map(m => m.load().catch(e => console.error(m.id, e))),
+  ];
   await Promise.all(charges);
 
   // Afficher météo ou panne
