@@ -12,23 +12,36 @@ Un affichage météo élégant pour Raspberry Pi, avec système de modules exten
 
 ## Installation
 
+> ⚠️ **Ne jamais ouvrir `index.html` en double-clic (`file://...`).** L'app
+> utilise des modules JavaScript (`import`/`export`), que les navigateurs
+> bloquent quand la page n'est pas servie via `http://` — l'erreur dans la
+> console ressemble à du CORS, mais ce n'en est pas : elle vient uniquement
+> du protocole `file://`. Utilise toujours un serveur local (voir plus bas).
+
 ### Sur Raspberry Pi OS (Bookworm+)
 
 ```bash
 cd /opt/kiosk
 git clone https://github.com/toi/kiosk .
 
-# Serveur local
-python3 -m http.server 8080 --bind 127.0.0.1 --directory /opt/kiosk &
-
-# Lancer dans Chromium (sans installer le vieux script)
-chromium-browser --kiosk http://127.0.0.1:8080/
+# Lance le serveur local + Chromium en kiosque, pointés sur http://
+./demarrer.sh
 ```
+
+`demarrer.sh` démarre `python3 -m http.server` sur le dossier du projet puis
+ouvre Chromium en mode kiosque sur `http://localhost:8000/` (jamais sur le
+fichier directement). Pour un déploiement permanent (service systemd,
+autologin, etc.), reprends la même logique — server + URL `http://`, jamais
+un chemin `file://`.
 
 ### En dev (local)
 
 ```bash
 cd kiosk
+./demarrer.sh          # Linux/macOS : lance le serveur + ouvre le navigateur
+demarrer.bat           # Windows : idem, en double-clic
+
+# Ou manuellement :
 python3 -m http.server 8000
 # Visiter: http://localhost:8000
 # Avec debug: http://localhost:8000?heure=18.5&ambiance=nuit
@@ -73,12 +86,13 @@ export class BitcoinModule extends Module {
 }
 ```
 
-Puis ajouter à `app.js`:
+Puis ajouter à `app.js`, dans le tableau `widgets` (le carrousel latéral —
+la météo, elle, pilote l'écran principal directement et n'y figure pas) :
 
 ```javascript
 import { BitcoinModule } from './modules/bitcoin.js';
 
-const modules = [
+const widgets = [
   // ...
   new BitcoinModule(),
 ];

@@ -13,6 +13,34 @@
 </head>
 <body>
 
+<script>
+// Les navigateurs bloquent les modules JS (import/export) quand la page
+// est ouverte en double-clic (file://), avec une erreur qui ressemble à
+// du CORS dans la console. Ce script (non-module) s'exécute quand même
+// dans ce cas-là, contrairement à app.js — on peut donc prévenir clairement
+// plutôt que de laisser un écran figé sans explication.
+if (location.protocol === 'file:') {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#070910;color:#ECF0F7;'
+    + 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+    + 'gap:1.2rem;font-family:system-ui,sans-serif;text-align:center;padding:2rem;';
+
+  var titre = document.createElement('div');
+  titre.style.cssText = 'font-size:1.6rem;font-weight:600;';
+  titre.textContent = 'Cette page doit être servie via HTTP, pas ouverte comme fichier';
+
+  var detail = document.createElement('div');
+  detail.style.cssText = 'font-size:1.05rem;opacity:.75;max-width:38rem;line-height:1.5;';
+  detail.textContent = 'Les navigateurs bloquent les modules JavaScript quand la page est ouverte '
+    + 'directement (file://) — double-clique sur demarrer.bat à la racine du projet, '
+    + 'ou lance python -m http.server puis ouvre http://localhost:8000.';
+
+  overlay.appendChild(titre);
+  overlay.appendChild(detail);
+  document.body.appendChild(overlay);
+}
+</script>
+
 <div id="ecran">
   <header id="bandeau">
     <div id="lieu">—</div>
