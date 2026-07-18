@@ -44,6 +44,36 @@
   color: var(--encre);
   font-variant-numeric: tabular-nums;
   text-transform: none;
+  cursor: pointer;
+}
+
+/* Grand affichage : un tap sur l'heure l'agrandit plein écran, comme
+   un réveil de chevet. Un tap n'importe où dessus la referme. */
+#horloge-grand {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #070910;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease;
+}
+
+#horloge-grand.ouvert {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#horloge-grand-heure {
+  font-family: 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 118, 'wght' 200;
+  font-size: min(42vh, 34vw);
+  letter-spacing: -.02em;
+  color: var(--encre);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Pages (météo + ruban) */

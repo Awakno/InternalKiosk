@@ -1,7 +1,7 @@
 import { Module } from './base.js';
 import { CONFIG } from '../config.js';
 import { fetchJSON } from '../lib/fetch.js';
-import { indiceAQI, emojiAQI } from '../lib/format.js';
+import { indiceAQI, emojiAQI, disponible } from '../lib/format.js';
 
 export class AirQualityModule extends Module {
   constructor(config = {}) {
@@ -30,12 +30,12 @@ export class AirQualityModule extends Module {
   }
 
   isRelevant() {
-    // Toujours intéressant sauf s'il n'y a pas de données
-    return !!this.data;
+    // Toujours intéressant, sauf si l'indice lui-même est absent
+    return disponible(this.data?.aqi);
   }
 
   renderCard() {
-    if (!this.data) return null;
+    if (!disponible(this.data?.aqi)) return null;
     return {
       label: 'Qualité de l\'air',
       valeur: `${emojiAQI(this.data.aqi)} ${indiceAQI(this.data.aqi)}`
@@ -43,7 +43,7 @@ export class AirQualityModule extends Module {
   }
 
   renderDetail() {
-    if (!this.data) return '';
+    if (!disponible(this.data?.aqi)) return '';
 
     const descriptions = {
       1: 'Excellent - pas de restrictions à prévoir',

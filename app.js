@@ -46,7 +46,7 @@ function snap() {
 }
 
 document.addEventListener('pointerdown', e => {
-  if (e.target.closest('#modules')) {
+  if (e.target.closest('#modules') || e.target.closest('#horloge')) {
     x0 = null;
     return;
   }
@@ -63,7 +63,7 @@ document.addEventListener('pointermove', e => {
   if (x0 === null) return;
   dx = e.clientX - x0;
   dy = e.clientY - y0;
-  if (document.body.classList.contains('fenetre-ouverte')) return;
+  if (document.body.classList.contains('fenetre-ouverte') || document.body.classList.contains('horloge-ouverte')) return;
 
   if (geste === null && Math.abs(dx) + Math.abs(dy) > 10) {
     geste = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
@@ -81,6 +81,11 @@ document.addEventListener('pointerup', () => {
   if (x0 === null) return;
   if (document.body.classList.contains('fenetre-ouverte')) {
     if (Math.abs(dx) > 40 || Math.abs(dy) > 40) fermerFenetre();
+    x0 = y0 = null;
+    geste = null;
+    return;
+  }
+  if (document.body.classList.contains('horloge-ouverte')) {
     x0 = y0 = null;
     geste = null;
     return;
@@ -105,7 +110,24 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') goToDay(weather.currentDay - 1);
   if (e.key === 'Home') goToDay(0);
   if (e.key === 'Escape' && document.body.classList.contains('fenetre-ouverte')) fermerFenetre();
+  if (e.key === 'Escape' && document.body.classList.contains('horloge-ouverte')) fermerGrandHorloge();
 });
+
+// ───────────────────────────────────────── Grand affichage horloge ─────────────────────────────────────
+
+function ouvrirGrandHorloge() {
+  document.getElementById('horloge-grand-heure').textContent = fmtHM.format(maintenant());
+  document.getElementById('horloge-grand').classList.add('ouvert');
+  document.body.classList.add('horloge-ouverte');
+}
+
+function fermerGrandHorloge() {
+  document.getElementById('horloge-grand').classList.remove('ouvert');
+  document.body.classList.remove('horloge-ouverte');
+}
+
+document.getElementById('horloge').addEventListener('click', ouvrirGrandHorloge);
+document.getElementById('horloge-grand').addEventListener('click', fermerGrandHorloge);
 
 // ───────────────────────────────────────── Modules ─────────────────────────────────────
 
@@ -181,7 +203,11 @@ document.querySelector('#fenetre .fermer').addEventListener('click', fermerFenet
 
 function battement() {
   const n = maintenant();
-  document.getElementById('horloge').textContent = fmtHM.format(n);
+  const heureTxt = fmtHM.format(n);
+  document.getElementById('horloge').textContent = heureTxt;
+  if (document.body.classList.contains('horloge-ouverte')) {
+    document.getElementById('horloge-grand-heure').textContent = heureTxt;
+  }
   if (weather.data) {
     weather.elairer(n);
     peindreModules();

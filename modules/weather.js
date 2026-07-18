@@ -1,7 +1,7 @@
 import { Module } from './base.js';
 import { CONFIG, fmtJour, fmtHM, maintenant } from '../config.js';
 import { fetchJSON } from '../lib/fetch.js';
-import { lireISO } from '../lib/format.js';
+import { lireISO, disponible } from '../lib/format.js';
 import { oklch, lerp, lerpH } from '../lib/color.js';
 import { meteo } from '../lib/icons.js';
 import { tracerRuban } from '../lib/ruban.js';
@@ -39,6 +39,10 @@ export class WeatherModule extends Module {
 
     const j = await fetchJSON(url);
 
+    // Math.round(null) vaut 0 : ça masquerait une donnée manquante
+    // derrière une fausse valeur plausible. On préserve donc le null.
+    const arrondi = v => v != null ? Math.round(v) : null;
+
     const heuresDe = cle => j.hourly.time
       .map((t, i) => ({ t, i }))
       .filter(o => o.t.startsWith(cle))
@@ -48,10 +52,10 @@ export class WeatherModule extends Module {
     const jours = j.daily.time.map((cle, n) => ({
       date: lireISO(cle + 'T12:00'),
       code: j.daily.weather_code[n],
-      max: Math.round(j.daily.temperature_2m_max[n]),
-      min: Math.round(j.daily.temperature_2m_min[n]),
-      pluie: j.daily.precipitation_probability_max[n] ?? 0,
-      vent: Math.round(j.daily.wind_speed_10m_max[n]),
+      max: arrondi(j.daily.temperature_2m_max[n]),
+      min: arrondi(j.daily.temperature_2m_min[n]),
+      pluie: j.daily.precipitation_probability_max[n] ?? null,
+      vent: arrondi(j.daily.wind_speed_10m_max[n]),
       lever: lireISO(j.daily.sunrise[n]),
       coucher: lireISO(j.daily.sunset[n]),
       pts: heuresDe(cle),
@@ -61,10 +65,10 @@ export class WeatherModule extends Module {
     const i0 = Math.max(0, j.hourly.time.findIndex(t => lireISO(t) >= new Date(depart)));
     Object.assign(jours[0], {
       code: j.current.weather_code,
-      temp: Math.round(j.current.temperature_2m),
-      ressenti: Math.round(j.current.apparent_temperature),
+      temp: arrondi(j.current.temperature_2m),
+      ressenti: arrondi(j.current.apparent_temperature),
       humidite: j.current.relative_humidity_2m,
-      vent: Math.round(j.current.wind_speed_10m),
+      vent: arrondi(j.current.wind_speed_10m),
       jour: j.current.is_day === 1,
       pts: j.hourly.time.slice(i0, i0 + 13).map((t, k) => ({
         date: lireISO(t),
@@ -120,9 +124,11 @@ export class WeatherModule extends Module {
   renderCard() {
     if (!this.data) return null;
     const d = this.data[this.currentDay];
+    const principal = this.currentDay === 0 ? d.temp : d.max;
+    if (!disponible(principal)) return null;
     return {
       label: 'Météo',
-      valeur: `${d.temp}°${this.currentDay === 0 ? '' : ' · ' + d.max + '°'}`
+      valeur: `${principal}°`
     };
   }
 
@@ -131,9 +137,20 @@ export class WeatherModule extends Module {
     const d = this.data[this.currentDay];
     const m = meteo(d.code, this.currentDay === 0 ? d.jour : true);
 
-    const lines = this.currentDay === 0
-      ? [`Ressenti ${d.ressenti}°`, `${d.max}° / ${d.min}°`, `Vent ${d.vent} km/h`, `Humidité ${d.humidite}%`]
-      : [`Pluie ${d.pluie}%`, `Vent ${d.vent} km/h`, `Lever ${fmtHM.format(d.lever)}`, `Coucher ${fmtHM.format(d.coucher)}`];
+    const lines = (this.currentDay === 0
+      ? [
+          disponible(d.ressenti) && `Ressenti ${d.ressenti}°`,
+          disponible(d.max) && disponible(d.min) && `${d.max}° / ${d.min}°`,
+          disponible(d.vent) && `Vent ${d.vent} km/h`,
+          disponible(d.humidite) && `Humidité ${d.humidite}%`,
+        ]
+      : [
+          disponible(d.pluie) && `Pluie ${d.pluie}%`,
+          disponible(d.vent) && `Vent ${d.vent} km/h`,
+          d.lever && `Lever ${fmtHM.format(d.lever)}`,
+          d.coucher && `Coucher ${fmtHM.format(d.coucher)}`,
+        ]
+    ).filter(Boolean);
 
     let html = `<h2>${fmtJour.format(d.date)}</h2><div class="sous">${m.nom}</div>`;
     lines.forEach(line => {
@@ -151,12 +168,22 @@ export class WeatherModule extends Module {
     document.getElementById('condition').textContent = m.nom;
 
     if (this.currentDay === 0) {
-      document.getElementById('temperature').innerHTML = `${d.temp}<i>°</i>`;
-      const mesures = [`Ressenti ${d.ressenti}°`, `${d.max}° / ${d.min}°`, `Vent ${d.vent} km/h`, `Humidité ${d.humidite}%`];
+      document.getElementById('temperature').innerHTML = disponible(d.temp) ? `${d.temp}<i>°</i>` : '—<i>°</i>';
+      const mesures = [
+        disponible(d.ressenti) && `Ressenti ${d.ressenti}°`,
+        disponible(d.max) && disponible(d.min) && `${d.max}° / ${d.min}°`,
+        disponible(d.vent) && `Vent ${d.vent} km/h`,
+        disponible(d.humidite) && `Humidité ${d.humidite}%`,
+      ].filter(Boolean);
       document.getElementById('mesures').innerHTML = mesures.map(t => `<span>${t}</span>`).join('');
     } else {
-      document.getElementById('temperature').innerHTML = `${d.max}<i>°</i><b>${d.min}°</b>`;
-      const mesures = [`Pluie ${d.pluie}%`, `Vent ${d.vent} km/h`];
+      document.getElementById('temperature').innerHTML = disponible(d.max) && disponible(d.min)
+        ? `${d.max}<i>°</i><b>${d.min}°</b>`
+        : disponible(d.max) ? `${d.max}<i>°</i>` : '—<i>°</i>';
+      const mesures = [
+        disponible(d.pluie) && `Pluie ${d.pluie}%`,
+        disponible(d.vent) && `Vent ${d.vent} km/h`,
+      ].filter(Boolean);
       document.getElementById('mesures').innerHTML = mesures.map(t => `<span>${t}</span>`).join('');
     }
 
