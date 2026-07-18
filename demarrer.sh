@@ -10,9 +10,14 @@ cd "$(dirname "$0")"
 PORT=8000
 URL="http://localhost:${PORT}/"
 
-python3 -m http.server "$PORT" >/tmp/kiosk-server.log 2>&1 &
+# --bind 127.0.0.1 : usage local uniquement, pas exposé au reste du réseau.
+# mktemp : un chemin de log prévisible dans /tmp serait attaquable par lien
+# symbolique sur une machine multi-utilisateurs.
+LOG_FILE="$(mktemp -t kiosk-server.XXXXXX.log)"
+
+python3 -m http.server "$PORT" --bind 127.0.0.1 >"$LOG_FILE" 2>&1 &
 SERVER_PID=$!
-trap 'kill "$SERVER_PID" 2>/dev/null' EXIT
+trap 'kill "$SERVER_PID" 2>/dev/null; rm -f "$LOG_FILE"' EXIT
 
 sleep 1
 
