@@ -138,7 +138,8 @@
 /* Ruban horaire */
 #ruban {
   flex: none;
-  height: 13.5rem;
+  height: 19rem;
+  margin: 0 -4rem;   /* déborde jusqu'aux bords de l'écran : la courbe gagne en largeur */
 }
 
 #ruban svg {
