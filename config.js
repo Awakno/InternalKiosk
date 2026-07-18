@@ -20,7 +20,7 @@ export const CONFIG = {
     weather: true,
     fuel: { enabled: true, type: 'sp98', rayon: 12000 },
     holidays: { enabled: true, academie: 'Versailles', zone: 'Zone C' },
-    airQuality: { enabled: true },
+    airQuality: { enabled: false },
   },
 };
 
