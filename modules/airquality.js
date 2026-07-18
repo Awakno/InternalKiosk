@@ -1,7 +1,7 @@
 import { Module } from './base.js';
 import { CONFIG } from '../config.js';
 import { fetchJSON } from '../lib/fetch.js';
-import { indiceAQI, emojiAQI, disponible } from '../lib/format.js';
+import { indiceAQI, emojiAQI, descriptionAQI, disponible } from '../lib/format.js';
 
 export class AirQualityModule extends Module {
   constructor(config = {}) {
@@ -45,14 +45,6 @@ export class AirQualityModule extends Module {
   renderDetail() {
     if (!disponible(this.data?.aqi)) return '';
 
-    const descriptions = {
-      1: 'Excellent - pas de restrictions à prévoir',
-      2: 'Bon - conditions favorables pour les activités',
-      3: 'Modéré - les groupes sensibles peuvent être affectés',
-      4: 'Mauvais - recommandation d\'éviter activités en plein air',
-      5: 'Très mauvais - rester autant que possible à l\'intérieur'
-    };
-
     const html = `<h2>Qualité de l'air</h2>
       <div class="sous">Indice européen AQI</div>
       <div class="ligne">
@@ -60,7 +52,7 @@ export class AirQualityModule extends Module {
         <div class="detail">Indice: ${this.data.aqi}</div>
       </div>
       <div style="margin-top: 1.5rem; font-size: 1.3rem; line-height: 1.5; color: var(--doux);">
-        ${descriptions[this.data.aqi] || 'Données indisponibles'}
+        ${descriptionAQI(this.data.aqi)}
       </div>`;
 
     return html;
