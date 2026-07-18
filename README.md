@@ -6,9 +6,9 @@ Un affichage météo élégant pour Raspberry Pi, avec système de modules exten
 
 ✅ **Modularisation complète** — Plus de monolithe HTML
 ✅ **Architecture plugin** — Ajouter des modules en 3 étapes
-✅ **4 modules inclus** — Météo, Carburant, Vacances, Qualité de l'air
+✅ **5 modules inclus** — Météo, Carburant, Vacances, Qualité de l'air, VPS OVH
 ✅ **Séparation des concerns** — Styles, lib, modules isolés
-✅ **Sécurité renforcée** — DOM methods, pas d'innerHTML brut
+✅ **Sécurité renforcée** — DOM methods, pas d'innerHTML brut, identifiants API jamais exposés au navigateur
 
 ## Installation
 
@@ -28,11 +28,11 @@ git clone https://github.com/toi/kiosk .
 ./demarrer.sh
 ```
 
-`demarrer.sh` démarre `python3 -m http.server` sur le dossier du projet puis
-ouvre Chromium en mode kiosque sur `http://localhost:8000/` (jamais sur le
-fichier directement). Pour un déploiement permanent (service systemd,
-autologin, etc.), reprends la même logique — server + URL `http://`, jamais
-un chemin `file://`.
+`demarrer.sh` démarre `server.py` (fichiers statiques + proxy API OVH, voir
+plus bas) sur le dossier du projet puis ouvre Chromium en mode kiosque sur
+`http://localhost:8000/` (jamais sur le fichier directement). Pour un
+déploiement permanent (service systemd, autologin, etc.), reprends la même
+logique — server + URL `http://`, jamais un chemin `file://`.
 
 ### En dev (local)
 
@@ -42,10 +42,15 @@ cd kiosk
 demarrer.bat           # Windows : idem, en double-clic
 
 # Ou manuellement :
-python3 -m http.server 8000
+python3 server.py 8000
 # Visiter: http://localhost:8000
 # Avec debug: http://localhost:8000?heure=18.5&ambiance=nuit
 ```
+
+`server.py` remplace `python3 -m http.server` : mêmes fichiers statiques,
+plus `/api/ovh-vps` pour le module OVH (voir plus bas). Sans identifiants
+OVH configurés, ce endpoint répond juste "non configuré" et le module reste
+invisible — aucun impact si tu n'utilises pas ce module.
 
 ## Modules
 
@@ -54,7 +59,8 @@ python3 -m http.server 8000
 | **Météo** | ✅ Inclus | Open-Meteo (gratuit) |
 | **Carburant** | ✅ Inclus | DATA.gouv.fr (France) |
 | **Vacances** | ✅ Inclus | DATA.education.gouv.fr |
-| **Qualité air** | ✅ Nouveau | Open-Meteo Air Quality |
+| **Qualité air** | ✅ Inclus | Open-Meteo Air Quality |
+| **VPS OVH** | ✅ Nouveau | API OVH (identifiants requis, voir plus bas) |
 
 ## Ajouter un module
 
@@ -98,6 +104,50 @@ const widgets = [
 ];
 ```
 
+## Module OVH VPS
+
+Affiche CPU/RAM/disque de ton VPS OVH, en jauges circulaires. Nécessite
+`server.py` (pas `python -m http.server`) car les identifiants OVH ne
+doivent jamais atteindre le navigateur — ils restent côté serveur, qui
+signe les requêtes vers l'API OVH et ne renvoie au kiosque que les 3
+pourcentages, jamais les clés.
+
+### 1. Créer les identifiants API
+
+1. Ouvre <https://eu.api.ovh.com/createApp/> (ou `api.us.ovhcloud.com` /
+   `ca.api.ovh.com` selon ta région) et crée une application : ça te donne
+   `Application Key` + `Application Secret`.
+2. Génère une `Consumer Key` avec un droit `GET` sur `/vps/*` uniquement
+   (pas besoin de plus) — la page de création d'app t'y redirige, ou utilise
+   l'API `POST /auth/credential`.
+3. Note aussi le nom exact de ton service (visible dans l'espace client OVH,
+   ressemble à `xxxyyyzzz.vps.ovh.net`).
+
+### 2. Configurer
+
+```bash
+cp .env.example .env
+# Édite .env avec tes vraies valeurs (jamais commité, voir .gitignore)
+```
+
+### 3. Activer le module
+
+Dans `config.js` :
+
+```javascript
+ovhVps: { enabled: true },
+```
+
+Relance `./demarrer.sh` (ou `demarrer.bat`) — ils chargent `.env`
+automatiquement avant de démarrer `server.py`.
+
+> ⚠️ `/vps/{serviceName}/statistics` est marqué *deprecated* côté OVH (mais
+> répond toujours en 2026) — c'est la seule source qui donne CPU/RAM/disque
+> en un seul appel simple ; l'alternative (`/monitoring`) est une série
+> temporelle bien plus complexe pour le même résultat. Si OVH la supprime un
+> jour, le module se contentera de disparaître (comme n'importe quel module
+> sans données) plutôt que de planter le kiosque.
+
 ## Configuration
 
 Éditer `config.js`:
@@ -133,10 +183,12 @@ export const CONFIG = {
 | `index.html` | DOM minimal |
 | `app.js` | Bootstrap + orchestration |
 | `config.js` | Configuration globale |
+| `server.py` | Fichiers statiques + proxy API OVH (identifiants côté serveur) |
+| `.env` / `.env.example` | Identifiants OVH (`.env` jamais commité) |
 | `modules/base.js` | Interface commune |
 | `modules/*.js` | Implémentations |
 | `styles/*.css` | Feuilles séparées |
-| `lib/*.js` | Utilitaires (color, fetch, dom) |
+| `lib/*.js` | Utilitaires (color, fetch, dom, gauge) |
 
 ## Debug
 

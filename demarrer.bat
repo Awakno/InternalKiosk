@@ -8,7 +8,12 @@ cd /d "%~dp0"
 
 set PORT=8000
 
-start "Kiosque - serveur local (ne pas fermer)" /min cmd /c "python -m http.server %PORT%"
+rem Identifiants OVH (module ovhVps) : charge .env s'il existe, jamais commite.
+if exist .env (
+  for /f "usebackq tokens=1,* delims==" %%A in (".env") do set "%%A=%%B"
+)
+
+start "Kiosque - serveur local (ne pas fermer)" /min cmd /c "python server.py %PORT%"
 
 timeout /t 1 /nobreak >nul
 

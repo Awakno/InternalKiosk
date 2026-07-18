@@ -10,12 +10,21 @@ cd "$(dirname "$0")"
 PORT=8000
 URL="http://localhost:${PORT}/"
 
-# --bind 127.0.0.1 : usage local uniquement, pas exposé au reste du réseau.
+# Identifiants OVH (module ovhVps) : charge .env s'il existe, jamais commité.
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+# --bind 127.0.0.1 est déjà géré dans server.py (identique à la contrainte
+# imposée ici auparavant pour python -m http.server).
 # mktemp : un chemin de log prévisible dans /tmp serait attaquable par lien
 # symbolique sur une machine multi-utilisateurs.
 LOG_FILE="$(mktemp -t kiosk-server.XXXXXX.log)"
 
-python3 -m http.server "$PORT" --bind 127.0.0.1 >"$LOG_FILE" 2>&1 &
+python3 server.py "$PORT" >"$LOG_FILE" 2>&1 &
 SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null; rm -f "$LOG_FILE"' EXIT
 

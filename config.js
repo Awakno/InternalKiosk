@@ -21,6 +21,10 @@ export const CONFIG = {
     fuel: { enabled: true, type: 'sp98', rayon: 12000 },
     holidays: { enabled: true, academie: 'Versailles', zone: 'Zone C' },
     airQuality: { enabled: false },
+    // Stats du VPS OVH (CPU/RAM/disque). Nécessite server.py (pas
+    // python -m http.server) + les variables OVH_* — voir README.md.
+    // Désactivé par défaut : rien à afficher tant que ce n'est pas configuré.
+    ovhVps: { enabled: false },
   },
 };
 

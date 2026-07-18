@@ -5,6 +5,7 @@ Thumbs.db
 # Développement
 node_modules/
 *.log
+.env
 .env.local
 
 # IDE
@@ -20,3 +21,5 @@ build/
 # Cache
 .cache/
 *.tmp
+__pycache__/
+*.pyc

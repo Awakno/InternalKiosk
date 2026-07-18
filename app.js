@@ -3,6 +3,7 @@ import { WeatherModule } from './modules/weather.js';
 import { FuelModule } from './modules/fuel.js';
 import { HolidaysModule } from './modules/holidays.js';
 import { AirQualityModule } from './modules/airquality.js';
+import { OvhVpsModule } from './modules/ovhvps.js';
 import { Module } from './modules/base.js';
 import { createText, createDiv, clearAndAppend, safeHTML } from './lib/dom.js';
 
@@ -17,6 +18,7 @@ const widgets = [
   new FuelModule(),
   new HolidaysModule(),
   new AirQualityModule(),
+  new OvhVpsModule(),
 ].filter(m => m.config.enabled !== false);
 
 let indexModule = 0;
@@ -210,10 +212,13 @@ function battement() {
   }
   if (weather.data) {
     weather.elairer(n);
-    peindreModules();
   } else {
     document.getElementById('lieu').textContent = `${CONFIG.location.name} · ${fmtJour.format(n)}`;
   }
+  // Le carrousel de widgets (carburant, vacances, OVH...) est indépendant
+  // de la météo : si l'API météo est en panne, les autres widgets doivent
+  // quand même s'afficher normalement.
+  peindreModules();
 }
 
 // ───────────────────────────────────────── Bootstrap ─────────────────────────────────────

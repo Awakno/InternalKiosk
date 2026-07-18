@@ -7,6 +7,8 @@ kiosk/
 ├── index.html            # DOM minimal
 ├── config.js             # Configuration + constantes globales
 ├── app.js                # Bootstrap + orchestration
+├── server.py             # Fichiers statiques + proxy API OVH signée
+├── .env / .env.example   # Identifiants OVH (.env jamais commité)
 ├── meteo.html            # Ancien monolithe (deprecated)
 │
 ├── lib/
@@ -15,14 +17,16 @@ kiosk/
 │   ├── fetch.js          # Fetch wrapper + cache
 │   ├── dom.js            # Utilitaires DOM sûrs
 │   ├── icons.js          # Icônes météo SVG + mapping code→condition
-│   └── ruban.js          # Graphique SVG horaire (courbe + pluie + jalons)
+│   ├── ruban.js          # Graphique SVG horaire (courbe + pluie + jalons)
+│   └── gauge.js          # Jauge circulaire SVG (anneau de progression %)
 │
 ├── modules/
 │   ├── base.js           # Classe Module de base
 │   ├── weather.js        # Météo + ruban horaire
 │   ├── fuel.js           # Prix carburants
 │   ├── holidays.js       # Vacances scolaires
-│   └── airquality.js     # Qualité de l'air (nouveau!)
+│   ├── airquality.js     # Qualité de l'air
+│   └── ovhvps.js         # Stats VPS OVH (nouveau!) — via server.py, jamais direct
 │
 └── styles/
     ├── base.css          # Reset + variables
