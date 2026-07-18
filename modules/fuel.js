@@ -1,7 +1,7 @@
 import { Module } from './base.js';
 import { CONFIG } from '../config.js';
 import { fetchJSON } from '../lib/fetch.js';
-import { fmtPrix, distanceKm } from '../lib/color.js';
+import { distanceKm } from '../lib/color.js';
 import { fmtPrix as fmt } from '../lib/format.js';
 
 export class FuelModule extends Module {
