@@ -1,4 +1,0 @@
-# Les scripts shell doivent garder des fins de ligne LF, même
-# checkout sur Windows -- sinon le shebang casse sur le Raspberry Pi
-# (#!/usr/bin/env bash\r -> "bad interpreter").
-*.sh text eol=lf
