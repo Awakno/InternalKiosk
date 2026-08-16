@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { CONFIG } from "@/lib/config";
-import { fmtHM, fmtJour, getEffectiveAmbiance } from "@/lib/time";
+import { fmtHM, fmtJour, getEffectiveAmbiance, getLuminositeOverride, getVeilleOverride } from "@/lib/time";
+import { computeLuminosite, estNuit } from "@/lib/luminosite";
 import { computeAmbientStyle } from "@/lib/weather/ambient";
 import { useWeather } from "@/hooks/useWeather";
 import { useClockTick } from "@/hooks/useClockTick";
@@ -12,11 +13,15 @@ import { useBigClockOverlay } from "@/hooks/useBigClockOverlay";
 import { useDetailOverlay } from "@/hooks/useDetailOverlay";
 import { useSwipeDay } from "@/hooks/useSwipeDay";
 import { useReturnToToday } from "@/hooks/useReturnToToday";
+import { useVeille } from "@/hooks/useVeille";
+import { useLuminosite } from "@/hooks/useLuminosite";
 import { WeatherScreen } from "@/components/weather/WeatherScreen";
 import { JoursNav } from "@/components/weather/JoursNav";
 import { ModuleCarousel } from "@/components/kiosk/ModuleCarousel";
 import { DetailOverlay } from "@/components/kiosk/DetailOverlay";
 import { BigClockOverlay } from "@/components/kiosk/BigClockOverlay";
+import { VeilleOverlay } from "@/components/kiosk/VeilleOverlay";
+import { FraicheurBadge } from "@/components/kiosk/FraicheurBadge";
 import { PanneScreen } from "@/components/kiosk/PanneScreen";
 
 export default function KioskApp() {
@@ -24,7 +29,22 @@ export default function KioskApp() {
   const now = useClockTick(20_000);
   const widgets = useModules(now);
   const qualifiedCount = widgets.filter((w) => w.isReady && w.isRelevant).length;
-  const activeIndex = useCarouselRotation(qualifiedCount, { intervalMs: 7000 });
+
+  const veilleDebug = getVeilleOverride();
+  const isVeille = useVeille({
+    enabled: CONFIG.veille.enabled && veilleDebug !== "off",
+    delaiMs: typeof veilleDebug === "number" ? veilleDebug : CONFIG.veille.delai,
+    autorise: !CONFIG.veille.seulementLaNuit || estNuit(now, CONFIG.luminosite),
+  });
+
+  // La veille impose son propre plancher de luminosité, sinon c'est le
+  // profil horaire qui décide. ?lum= court-circuite les deux.
+  const lumForcee = getLuminositeOverride();
+  useLuminosite(lumForcee ?? (isVeille ? CONFIG.veille.luminosite : computeLuminosite(now, CONFIG.luminosite)));
+
+  // Faire tourner le carrousel derrière un écran endormi ne sert à rien --
+  // et au réveil, on retombe sur le widget qu'on avait laissé.
+  const activeIndex = useCarouselRotation(qualifiedCount, { intervalMs: 7000, paused: isVeille });
 
   const bigClock = useBigClockOverlay();
   const detail = useDetailOverlay();
@@ -87,8 +107,11 @@ export default function KioskApp() {
     <>
       <div id="ecran">
         <header id="bandeau">
-          <div id="lieu" className={lieuFutur ? "futur" : ""}>
-            {lieuText}
+          <div id="lieu-bloc">
+            <div id="lieu" className={lieuFutur ? "futur" : ""}>
+              {lieuText}
+            </div>
+            <FraicheurBadge savedAt={weather.savedAt} isStale={weather.isStale} />
           </div>
           <div id="horloge" onClick={bigClock.open}>
             {heureTxt}
@@ -119,6 +142,11 @@ export default function KioskApp() {
         }}
       />
       <BigClockOverlay isOpen={bigClock.isOpen} heureTxt={heureTxt} onClose={bigClock.close} />
+      <VeilleOverlay isOpen={isVeille} heureTxt={heureTxt} />
+      {/* Voile d'assombrissement : au-dessus de tout le reste, y compris
+          des overlays, pour que la luminosité soit celle de l'écran et pas
+          celle d'un calque particulier. */}
+      <div id="tamis" />
     </>
   );
 }

@@ -13,6 +13,13 @@
   --trait:   rgba(236, 240, 247, .10);
   --accent:  #ECF0F7;
   --pluie:   #4E9FD6;
+  --alerte:  #D89A63;
+
+  /* Pilotées par useLuminosite. Valeurs de repli : image intacte, au cas
+     où le JS n'aurait pas encore tourné (le voile ne doit jamais assombrir
+     par défaut). */
+  --luminosite: 1;
+  --tamis-duree: 3s;
 }
 
 * {
@@ -88,12 +95,28 @@ body::after {
   color: var(--doux);
 }
 
+/* Le bandeau garde deux enfants (bloc gauche / horloge) pour son
+   space-between : le badge de fraîcheur se glisse SOUS le lieu, il ne
+   devient donc pas un troisième élément qui déséquilibrerait la ligne. */
+#lieu-bloc {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+
 #lieu {
   transition: color .4s;
 }
 
 #lieu.futur {
   color: var(--accent);
+}
+
+#fraicheur {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.15rem;
+  letter-spacing: .14em;
+  color: var(--alerte);
 }
 
 #horloge {
@@ -308,6 +331,65 @@ body::after {
   font-size: 1.7rem;
   color: var(--doux);
   letter-spacing: .06em;
+}
+
+/* ───────────────────────── veille + luminosité ───────────────────────── */
+
+/* Écran de veille : tout s'efface sauf l'heure.
+   Le fondu est asymétrique -- s'endormir en douceur (1,4 s), se réveiller
+   tout de suite (.25 s, règle de base appliquée quand .ouvert est retiré).
+   Un écran qui met une seconde à revenir sous le doigt passe pour planté. */
+#veille {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+
+#veille.ouvert {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 1.4s ease;
+}
+
+#veille-heure {
+  font-family: 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 118, 'wght' 150;
+  font-size: min(20vh, 16vw);
+  letter-spacing: -.015em;
+  color: var(--encre);
+  font-variant-numeric: tabular-nums;
+  opacity: .78;
+  /* Dérive lente : la même heure au même pixel toutes les nuits pendant
+     des mois finit par marquer la dalle. Un cycle dure 15 min. */
+  animation: derive 900s linear infinite;
+}
+
+@keyframes derive {
+  0%   { transform: translate(-7%, -9%); }
+  25%  { transform: translate(8%, -4%); }
+  50%  { transform: translate(5%, 9%); }
+  75%  { transform: translate(-6%, 6%); }
+  100% { transform: translate(-7%, -9%); }
+}
+
+/* Voile d'assombrissement. Une page web ne peut pas baisser le
+   rétroéclairage : on superpose du noir. Au-dessus de tous les calques
+   (veille comprise) pour que le réglage porte sur l'écran entier. */
+#tamis {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  background: #000;
+  opacity: calc(1 - var(--luminosite, 1));
+  transition: opacity var(--tamis-duree, 3s) ease;
 }
 
 /* ───────────────────────── modules.css ───────────────────────── */

@@ -8,4 +8,10 @@ export interface ModuleResult<T> {
   data: T | null;
   isReady: boolean;
   isRelevant: boolean;
+  // Fraîcheur de la donnée affichée (cf. usePersistentData) : elle peut
+  // provenir du cache persistant et donc être antérieure au démarrage de
+  // la page. Le carrousel n'en tient pas compte, mais les vues détail et
+  // le bandeau peuvent la signaler.
+  savedAt: Date | null;
+  isStale: boolean;
 }
