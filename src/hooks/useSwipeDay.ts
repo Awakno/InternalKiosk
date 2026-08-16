@@ -42,7 +42,10 @@ export function useSwipeDay({ currentDay, dayCount, onChangeDay, onInteract, dis
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest("#modules") || target.closest("#horloge")) {
+      // Zones qui pilotent elles-mêmes la navigation : un appui dessus ne
+      // doit pas être compté comme le début d'un balayage, sinon un doigt
+      // qui ripe sur une pastille change de jour EN PLUS de la sélection.
+      if (target.closest("#modules") || target.closest("#horloge") || target.closest("#jours")) {
         state.current.x0 = null;
         return;
       }

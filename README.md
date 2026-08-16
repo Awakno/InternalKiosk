@@ -49,6 +49,27 @@ Garde le pattern de relance en boucle déjà en place (voir le script dans
 `/usr/bin/` sur le Pi) pour que Chromium redémarre s'il plante — il n'y a
 plus de serveur local à superviser en plus.
 
+## Interactions tactiles
+
+| Geste | Effet |
+|---|---|
+| Balayage horizontal | Jour précédent / suivant (avec résistance aux bords) |
+| Appui sur une pastille de jour | Va directement à ce jour |
+| Appui sur la carte widget | Ouvre la fenêtre détail |
+| Appui sur une pastille de widget | Affiche ce widget et suspend la rotation |
+| Appui sur l'heure | Grand affichage plein écran |
+| Appui n'importe où (écran en veille) | Réveille, sans autre effet |
+
+Sans curseur ni survol, un écran tactile n'a que l'appui pour dire qu'il a
+compris : chaque cible réagit en ~90 ms, bien avant l'ouverture de la
+fenêtre (300 ms). Les cibles font au moins 44 px — les pastilles restent
+visuellement fines, c'est leur zone tactile qui est élargie par
+pseudo-élément, pour ne pas prendre de hauteur sur 600 px d'écran.
+
+Après une sélection au doigt dans le carrousel, la rotation automatique
+s'interrompt pendant `carrousel.pauseApresTouche` (25 s) : faire glisser
+la carte 7 s après qu'on l'a choisie reviendrait à annuler le geste.
+
 ## Écran allumé 24/7
 
 Trois comportements réglables dans `src/lib/config.ts`, pensés pour un

@@ -44,7 +44,11 @@ export default function KioskApp() {
 
   // Faire tourner le carrousel derrière un écran endormi ne sert à rien --
   // et au réveil, on retombe sur le widget qu'on avait laissé.
-  const activeIndex = useCarouselRotation(qualifiedCount, { intervalMs: 7000, paused: isVeille });
+  const { activeIndex, selectionner } = useCarouselRotation(qualifiedCount, {
+    intervalMs: CONFIG.carrousel.intervalMs,
+    pauseApresTouche: CONFIG.carrousel.pauseApresTouche,
+    paused: isVeille,
+  });
 
   const bigClock = useBigClockOverlay();
   const detail = useDetailOverlay();
@@ -124,9 +128,18 @@ export default function KioskApp() {
               data={weather.data}
               currentDay={weather.currentDay}
               dragOverride={dragOverride}
-              modulesSlot={<ModuleCarousel widgets={widgets} activeIndex={activeIndex} onOpen={detail.open} />}
+              modulesSlot={<ModuleCarousel widgets={widgets} activeIndex={activeIndex} onOpen={detail.open} onSelect={selectionner} />}
             />
-            <JoursNav count={weather.data.length} currentDay={weather.currentDay} />
+            <JoursNav
+              count={weather.data.length}
+              currentDay={weather.currentDay}
+              onSelect={(n) => {
+                weather.goToDay(n);
+                // Même réarmement que pour un balayage : consulter un jour
+                // au doigt doit repousser le retour automatique à aujourd'hui.
+                reveil();
+              }}
+            />
           </>
         )}
       </div>

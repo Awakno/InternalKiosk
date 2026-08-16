@@ -29,6 +29,13 @@ export interface LuminositeConfig extends ModuleToggle {
   transition: number;
 }
 
+export interface CarrouselConfig {
+  intervalMs: number;
+  // Après une sélection au doigt, délai avant que la rotation automatique
+  // ne reprenne : assez long pour lire la carte qu'on vient de choisir.
+  pauseApresTouche: number;
+}
+
 export interface VeilleConfig extends ModuleToggle {
   delai: number;
   // Ne se met en veille que dans la plage nocturne définie ci-dessus :
@@ -61,6 +68,7 @@ export interface KioskConfig {
   nbJours: number;
   retourAujourd: number;
   rafraichir: number;
+  carrousel: CarrouselConfig;
   luminosite: LuminositeConfig;
   veille: VeilleConfig;
   cache: CacheConfig;
@@ -89,6 +97,11 @@ export const CONFIG: KioskConfig = {
   nbJours: 5,
   retourAujourd: 45 * 1000,
   rafraichir: 10 * MINUTE,
+
+  carrousel: {
+    intervalMs: 7 * 1000,
+    pauseApresTouche: 25 * 1000,
+  },
 
   luminosite: {
     enabled: true,
