@@ -1,4 +1,8 @@
 // Fetch wrapper avec cache naïf et retry
+//
+// Ce cache-ci est un simple dédoublonnage à l'échelle de l'onglet : il
+// disparaît au rechargement. La persistance entre redémarrages est assurée
+// par lib/cache.ts, en amont dans usePersistentData.
 
 interface CacheEntry {
   data: unknown;
@@ -12,8 +16,15 @@ export interface FetchJSONOptions extends RequestInit {
   retries?: number;
 }
 
+// Doit rester nettement sous CONFIG.rafraichir : à durée égale (l'ancienne
+// valeur, 10 min, était exactement celle de la cadence), un rafraîchissement
+// programmé tombe à la frontière de l'expiration et se fait resservir
+// l'entrée périmée une fois sur deux -- le module sautait alors un cycle
+// entier sans jamais toucher le réseau.
+const TTL_DEDOUBLONNAGE = 30_000;
+
 export async function fetchJSON<T = unknown>(url: string, options: FetchJSONOptions = {}): Promise<T> {
-  const { ttl = 600_000, retries = 2, ...fetchOpts } = options;
+  const { ttl = TTL_DEDOUBLONNAGE, retries = 2, ...fetchOpts } = options;
 
   // Vérifier cache
   const cached = cache.get(url);

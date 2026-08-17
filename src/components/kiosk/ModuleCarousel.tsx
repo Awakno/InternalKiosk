@@ -7,6 +7,7 @@ export interface ModuleCarouselProps {
   widgets: WidgetEntry[];
   activeIndex: number;
   onOpen: (id: string) => void;
+  onSelect: (i: number) => void;
 }
 
 // Note : contrairement à l'ancien peindreModules() (qui comparait une
@@ -15,7 +16,7 @@ export interface ModuleCarouselProps {
 // change (rotation du carrousel). Une mise à jour de donnée en place (ex.
 // le % CPU qui bouge) s'affiche donc instantanément plutôt qu'en fondu --
 // différence mineure et assumée, pas un bug fonctionnel.
-export function ModuleCarousel({ widgets, activeIndex, onOpen }: ModuleCarouselProps) {
+export function ModuleCarousel({ widgets, activeIndex, onOpen, onSelect }: ModuleCarouselProps) {
   const qualifies = widgets.filter((w) => w.isReady && w.isRelevant);
   const clamped = activeIndex >= qualifies.length ? 0 : activeIndex;
   const current = qualifies[clamped] ?? null;
@@ -57,7 +58,21 @@ export function ModuleCarousel({ widgets, activeIndex, onOpen }: ModuleCarouselP
       {qualifies.length > 1 && (
         <div id="modules-points">
           {qualifies.map((w, i) => (
-            <span key={w.id} className={i === clamped ? "actif" : ""} />
+            <button
+              key={w.id}
+              type="button"
+              aria-label={`Afficher ${w.id}`}
+              aria-current={i === clamped}
+              // Les pastilles vivent dans #modules, qui ouvre la fenêtre
+              // détail au clic : sans ça, choisir un widget ouvrirait dans
+              // la foulée le détail de celui qu'on vient de quitter.
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(i);
+              }}
+            >
+              <span className={i === clamped ? "actif" : ""} />
+            </button>
           ))}
         </div>
       )}

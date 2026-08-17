@@ -20,6 +20,33 @@ export function getEffectiveAmbiance(): "ciel" | "nuit" {
   return override === "nuit" || override === "ciel" ? override : CONFIG.ambiance;
 }
 
+// ?lum=0.3 force la luminosité, ?lum=off la désactive (image intacte).
+// Sans ces leviers, régler l'assombrissement nocturne demanderait d'être
+// devant le kiosque à 23 h.
+export function getLuminositeOverride(): number | null {
+  const v = getDebugArgs().get("lum");
+  if (v === null) return null;
+  if (v === "off") return 1;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : null;
+}
+
+// Réglage de la veille depuis l'URL :
+//   ?veille=off  désactive (indispensable pendant les réglages, sinon
+//                l'écran s'endort au milieu des tests)
+//   ?veille=on   endort tout de suite
+//   ?veille=10   raccourcit le délai d'inactivité à 10 s, pour juger de
+//                l'endormissement et du réveil sans attendre 4 minutes
+// Renvoie "off", un délai en millisecondes, ou null si pas d'override.
+export function getVeilleOverride(): "off" | number | null {
+  const v = getDebugArgs().get("veille");
+  if (v === null) return null;
+  if (v === "off") return "off";
+  if (v === "on") return 0;
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n * 1000 : null;
+}
+
 // ?heure=6.5 fige l'horloge affichée à 6h30, pour tester le rendu jour/nuit
 // sans attendre la vraie heure.
 export function maintenant(): Date {
