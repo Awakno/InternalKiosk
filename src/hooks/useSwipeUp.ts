@@ -28,7 +28,14 @@ export function useSwipeUp({ isOpen, onOpen, onClose, disabled }: UseSwipeUpOpti
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest("#modules") || target.closest("#horloge") || target.closest("#jours") || target.closest("#actions")) {
+      // #actions n'est PAS dans cette liste : contrairement à
+      // #modules/#horloge/#jours (zones du fond, jamais concernées par la
+      // fermeture), un balayage vers le bas pour refermer commence
+      // forcément à l'intérieur de #actions -- l'en exclure empêchait
+      // justement ce geste de fonctionner (#actions passe en
+      // pointer-events:none une fois fermé, donc ce closest() ne pouvait de
+      // toute façon matcher que pendant que l'overlay est ouvert).
+      if (target.closest("#modules") || target.closest("#horloge") || target.closest("#jours")) {
         state.current.x0 = null;
         return;
       }
