@@ -26,19 +26,17 @@ export function useSwipeUp({ isOpen, onOpen, onClose, disabled }: UseSwipeUpOpti
   });
 
   useEffect(() => {
+    // Pas de zones exclues façon useSwipeDay (#modules/#horloge/#jours) :
+    // ça a du sens là-bas parce qu'un balayage HORIZONTAL y entre en
+    // conflit avec le tap qui sélectionne un widget/jour. Un balayage
+    // VERTICAL, lui, ne rentre jamais en conflit avec ces taps -- un tap a
+    // un dy quasi nul, largement sous SEUIL, donc le seuil suffit à lui
+    // seul à les distinguer. Exclure #jours ici cassait justement le
+    // geste : #jours est en bas d'écran (juste à côté de la poignée), au
+    // point de départ naturel d'un balayage vers le haut, et sa cible
+    // tactile élargie (button::after, inset -1.8rem) avalait le
+    // pointerdown avant qu'un balayage n'ait pu commencer.
     const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      // #actions n'est PAS dans cette liste : contrairement à
-      // #modules/#horloge/#jours (zones du fond, jamais concernées par la
-      // fermeture), un balayage vers le bas pour refermer commence
-      // forcément à l'intérieur de #actions -- l'en exclure empêchait
-      // justement ce geste de fonctionner (#actions passe en
-      // pointer-events:none une fois fermé, donc ce closest() ne pouvait de
-      // toute façon matcher que pendant que l'overlay est ouvert).
-      if (target.closest("#modules") || target.closest("#horloge") || target.closest("#jours")) {
-        state.current.x0 = null;
-        return;
-      }
       state.current = { x0: e.clientX, y0: e.clientY };
     };
 
