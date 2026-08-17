@@ -670,6 +670,13 @@ body::after {
   opacity: .6;
 }
 
+/* #fenetre reste en contenu justifié à gauche (titres, lignes de
+   détail) ; #actions, lui, centre sa grille -- le repli suit. */
+#actions .retour {
+  flex: none;
+  text-align: center;
+}
+
 /* ───────────────────────── actions.css ───────────────────────── */
 /* Tableau d'actions : overlay plein écran atteint par balayage vertical
    (useSwipeUp) ou par la poignée en bas d'écran. Même famille visuelle et
@@ -687,6 +694,8 @@ body::after {
   transform: translateY(4%);
   transition: opacity .3s ease, transform .34s cubic-bezier(.2,.7,.3,1);
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 #actions.ouvert {
@@ -695,8 +704,15 @@ body::after {
   transform: none;
 }
 
+/* flex:1 plutôt que height:100% : #actions-corps partage la hauteur avec
+   .retour (qui le suit dans le flux) au lieu de la monopoliser -- avec
+   height:100%, .retour s'ajoutait EN PLUS de ce 100%, dépassait le
+   viewport, et forçait un scroll juste pour lire ce texte de repli.
+   min-height:0 est nécessaire pour qu'une grille en enfant flex ait le
+   droit de rétrécir sous sa taille de contenu par défaut. */
 #actions-corps {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
   align-content: center;
