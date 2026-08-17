@@ -385,11 +385,13 @@ body::after {
   background: var(--accent);
 }
 
-#fenetre .fermer {
+#fenetre .fermer,
+#actions .fermer {
   transition: opacity .09s ease-out, transform .09s ease-out;
 }
 
-#fenetre .fermer:active {
+#fenetre .fermer:active,
+#actions .fermer:active {
   opacity: .5;
   transform: scale(.88);
 }
@@ -398,21 +400,24 @@ body::after {
    ne doit pas rester accroché à la dernière pastille touchée. */
 #jours button:focus,
 #modules-points button:focus,
-#fenetre .fermer:focus {
+#fenetre .fermer:focus,
+#actions .fermer:focus {
   outline: none;
 }
 
 #jours button:focus-visible span,
 #modules-points button:focus-visible span,
-#fenetre .fermer:focus-visible {
+#fenetre .fermer:focus-visible,
+#actions .fermer:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: .4rem;
 }
 
 /* body a touch-action:none pour neutraliser zoom et rebond de page ; la
-   fenêtre détail, elle, doit rester défilable au doigt si un module
-   affiche plus de lignes que la hauteur d'écran. */
-#fenetre {
+   fenêtre détail et le tableau d'actions, eux, doivent rester défilables
+   au doigt si leur contenu dépasse la hauteur d'écran. */
+#fenetre,
+#actions {
   touch-action: pan-y;
   overscroll-behavior: contain;
 }
@@ -588,7 +593,8 @@ body::after {
    décalage de mise en page. Carré explicite plutôt que padding, sinon la
    croix -- plus haute que large -- donne une cible étroite (45 px) et on
    la rate en visant du pouce. Décalage compensé sur top/right. */
-#fenetre .fermer {
+#fenetre .fermer,
+#actions .fermer {
   position: absolute;
   top: .7rem;
   right: 1.4rem;
@@ -653,7 +659,8 @@ body::after {
   color: var(--accent);
 }
 
-#fenetre .retour {
+#fenetre .retour,
+#actions .retour {
   margin-top: 2.4rem;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 1.1rem;
@@ -661,6 +668,131 @@ body::after {
   text-transform: uppercase;
   color: var(--doux);
   opacity: .6;
+}
+
+/* ───────────────────────── actions.css ───────────────────────── */
+/* Tableau d'actions : overlay plein écran atteint par balayage vertical
+   (useSwipeUp) ou par la poignée en bas d'écran. Même famille visuelle et
+   même mécanique d'ouverture/fermeture que #fenetre (opacity + translate),
+   mais glisse depuis le bas plutôt que depuis un léger décalage vertical,
+   pour rappeler la direction du geste qui l'ouvre. */
+#actions {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: #070910;
+  padding: 3.4rem 4.2rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4%);
+  transition: opacity .3s ease, transform .34s cubic-bezier(.2,.7,.3,1);
+  overflow-y: auto;
+}
+
+#actions.ouvert {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+#actions-corps {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  align-content: center;
+  justify-items: center;
+  gap: 2rem;
+}
+
+/* Carré explicite (aspect-ratio) plutôt que hauteur fixe : la grille reste
+   cohérente quel que soit le nombre de boutons ajoutés plus tard. */
+.bouton-action {
+  width: 100%;
+  max-width: 18rem;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(236, 240, 247, .04);
+  border: 1px solid var(--trait);
+  border-radius: 1.4rem;
+  color: var(--doux);
+  cursor: pointer;
+  transition: transform .09s ease-out, border-color .25s ease, background .25s ease, color .25s ease;
+}
+
+.bouton-action svg {
+  width: 40%;
+  height: 40%;
+}
+
+.bouton-action:active {
+  transform: scale(.965);
+}
+
+.bouton-action.actif {
+  color: var(--encre);
+  border-color: var(--accent);
+  background: rgba(236, 240, 247, .08);
+}
+
+.bouton-action.actif svg {
+  color: var(--accent);
+}
+
+.bouton-action:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.bouton-action-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.3rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.bouton-action-etat {
+  font-variation-settings: 'wdth' 110, 'wght' 230;
+  font-size: 1.6rem;
+  color: inherit;
+}
+
+/* Poignée : indice visuel permanent + cible de repli en tap. Zone tactile
+   élargie par ::after (même truc que #jours button), la barre visible
+   reste discrète pour ne pas concurrencer le reste de l'écran. */
+#poignee-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 1.1rem;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+#poignee-actions::after {
+  content: '';
+  position: absolute;
+  inset: -1.6rem -3rem;
+}
+
+#poignee-actions span {
+  display: block;
+  width: 4rem;
+  height: .34rem;
+  border-radius: 1rem;
+  background: var(--doux);
+  opacity: .3;
+  transition: opacity .09s ease-out, transform .09s ease-out;
+}
+
+#poignee-actions:active span {
+  opacity: .7;
+  transform: scaleX(1.15);
 }
 
 /* ───────────────────────── kiosk boot placeholder ───────────────────────── */

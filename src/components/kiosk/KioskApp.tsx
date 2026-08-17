@@ -12,6 +12,8 @@ import { useCarouselRotation } from "@/hooks/useCarouselRotation";
 import { useBigClockOverlay } from "@/hooks/useBigClockOverlay";
 import { useDetailOverlay } from "@/hooks/useDetailOverlay";
 import { useSwipeDay } from "@/hooks/useSwipeDay";
+import { useActionsOverlay } from "@/hooks/useActionsOverlay";
+import { useSwipeUp } from "@/hooks/useSwipeUp";
 import { useReturnToToday } from "@/hooks/useReturnToToday";
 import { useVeille } from "@/hooks/useVeille";
 import { useLuminosite } from "@/hooks/useLuminosite";
@@ -19,6 +21,7 @@ import { WeatherScreen } from "@/components/weather/WeatherScreen";
 import { JoursNav } from "@/components/weather/JoursNav";
 import { ModuleCarousel } from "@/components/kiosk/ModuleCarousel";
 import { DetailOverlay } from "@/components/kiosk/DetailOverlay";
+import { ActionsOverlay } from "@/components/kiosk/ActionsOverlay";
 import { BigClockOverlay } from "@/components/kiosk/BigClockOverlay";
 import { VeilleOverlay } from "@/components/kiosk/VeilleOverlay";
 import { FraicheurBadge } from "@/components/kiosk/FraicheurBadge";
@@ -52,10 +55,11 @@ export default function KioskApp() {
 
   const bigClock = useBigClockOverlay();
   const detail = useDetailOverlay();
+  const actions = useActionsOverlay();
 
   const reveil = useReturnToToday(weather.currentDay, weather.goToDay, CONFIG.retourAujourd);
 
-  const overlaysBlocking = detail.isOpen || bigClock.isOpen;
+  const overlaysBlocking = detail.isOpen || bigClock.isOpen || actions.isOpen;
   const dragOverride = useSwipeDay({
     currentDay: weather.currentDay,
     dayCount: weather.data?.length ?? 1,
@@ -71,6 +75,15 @@ export default function KioskApp() {
         weather.goToDay(0);
       }
     },
+  });
+  // Geste vertical indépendant du geste horizontal ci-dessus : ouvre/ferme
+  // le tableau d'actions, désactivé seulement par les DEUX AUTRES overlays
+  // (pas par actions.isOpen lui-même, sinon on ne pourrait jamais l'ouvrir).
+  useSwipeUp({
+    isOpen: actions.isOpen,
+    onOpen: actions.open,
+    onClose: actions.close,
+    disabled: detail.isOpen || bigClock.isOpen,
   });
 
   // Ambiance (dégradé de fond + --accent) : recalculée à chaque tick
@@ -96,10 +109,11 @@ export default function KioskApp() {
         weather.goToDay(0);
       }
       if (e.key === "Escape" && bigClock.isOpen) bigClock.close();
+      if (e.key === "Escape" && actions.isOpen) actions.close();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [weather, detail, bigClock]);
+  }, [weather, detail, bigClock, actions]);
 
   const heureTxt = fmtHM.format(now);
   const lieuText = weather.data
@@ -142,6 +156,13 @@ export default function KioskApp() {
             />
           </>
         )}
+
+        {/* Affordance de secours : le geste de balayage vertical (useSwipeUp)
+            n'est pas forcément découvert tout seul -- ce bouton donne le même
+            accès en tap, en plus de servir d'indice visuel permanent. */}
+        <button type="button" id="poignee-actions" aria-label="Ouvrir le tableau d'actions" onClick={actions.open}>
+          <span />
+        </button>
       </div>
 
       <PanneScreen visible={!weather.data} />
@@ -154,6 +175,7 @@ export default function KioskApp() {
           weather.goToDay(0);
         }}
       />
+      <ActionsOverlay isOpen={actions.isOpen} onClose={actions.close} />
       <BigClockOverlay isOpen={bigClock.isOpen} heureTxt={heureTxt} onClose={bigClock.close} />
       <VeilleOverlay isOpen={isVeille} heureTxt={heureTxt} />
       {/* Voile d'assombrissement : au-dessus de tout le reste, y compris

@@ -14,6 +14,13 @@ export interface HolidaysConfig extends ModuleToggle {
   zone: string;
 }
 
+// L'appareil est découvert automatiquement via l'API (voir
+// src/lib/govee/client.ts) -- seule la clé GOVEE_API_KEY (côté serveur
+// uniquement) reste à fournir, rien à saisir ici.
+export interface ActionsConfig {
+  govee: ModuleToggle;
+}
+
 // Assombrissement nocturne. Le kiosque est une page web : elle ne peut pas
 // piloter le rétroéclairage de la dalle, seulement voiler l'image. Pour
 // éteindre vraiment le rétroéclairage, il faut un script côté Pi (voir
@@ -78,6 +85,7 @@ export interface KioskConfig {
     holidays: HolidaysConfig;
     airQuality: ModuleToggle;
   };
+  actions: ActionsConfig;
 }
 
 const MINUTE = 60 * 1000;
@@ -136,5 +144,9 @@ export const CONFIG: KioskConfig = {
     fuel: { enabled: true, type: "sp98", rayon: 12000 },
     holidays: { enabled: true, academie: "Versailles", zone: "Zone C" },
     airQuality: { enabled: false },
+  },
+
+  actions: {
+    govee: { enabled: true },
   },
 };
