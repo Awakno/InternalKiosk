@@ -94,9 +94,9 @@ const JOUR = 24 * HEURE;
 
 export const CONFIG: KioskConfig = {
   location: {
-    name: "Vaugrigneuse",
-    latitude: 48.6244352,
-    longitude: 2.1195366,
+    name: process.env.CITY || "Paris",
+    latitude: process.env.LATITUDE ? parseFloat(process.env.LATITUDE) : 0,
+    longitude: process.env.LONGITUDE ? parseFloat(process.env.LONGITUDE) : 0,
     timezone: "Europe/Paris",
   },
 
